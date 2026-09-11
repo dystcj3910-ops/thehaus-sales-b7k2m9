@@ -28,6 +28,7 @@ color-scheme: dark;
 --budget:#3e3e3a;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--plane); color:var(--ink);
 font-family:"Noto Sans JP",system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif;
 font-size:14px; line-height:1.65;}
@@ -43,6 +44,18 @@ font:inherit; font-size:13px; padding:6px 14px; border-radius:8px; cursor:pointe
 .seg button[aria-pressed="true"]{background:var(--surface); color:var(--ink); font-weight:600;
 box-shadow:0 1px 2px rgba(0,0,0,.08), 0 0 0 1px var(--ring)}
 .segnote{color:var(--muted); font-size:12px; margin:2px 0 18px}
+#gate{margin:26px 0 0}
+.gatebox{background:var(--surface); border:1px solid var(--ring); border-radius:12px;
+padding:22px 20px; max-width:420px}
+.gatelab{margin:0 0 12px; font-size:13px; color:var(--ink-2)}
+#gateform{display:flex; gap:8px; flex-wrap:wrap}
+#pass{flex:1 1 180px; min-width:0; font:inherit; font-size:14px; padding:9px 12px;
+border:1px solid var(--axis); border-radius:9px; background:var(--plane); color:var(--ink)}
+#pass:focus{outline:2px solid var(--s1); outline-offset:1px}
+#gateform button{appearance:none; border:0; background:var(--s1); color:#fff; font:inherit;
+font-weight:600; padding:9px 20px; border-radius:9px; cursor:pointer}
+#gateform button:hover{filter:brightness(1.08)}
+.gateerr{margin:10px 0 0; font-size:12.5px; color:var(--crit)}
 .statusrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px}
 .status{font-size:12px; padding:3px 10px; border-radius:999px; font-weight:500}
 .status.loading{background:var(--surface-2); color:var(--ink-2)}
@@ -105,12 +118,22 @@ footer b{color:var(--ink-2)}
 <h1>広告費ダッシュボード</h1>
 <p class="sub">THE HAUS ／ 第18期（2026年5月〜2027年4月）</p>
 <p class="meta">出典：「THEHAUS様_業績管理」の<b>26/27広告宣伝費</b>・<b>25/26業績把握</b>シート（連携シート経由で自動取得）</p>
-<div class="statusrow">
+<div class="statusrow" id="statusrow" hidden>
 <span class="status loading" id="status">読み込み中…</span>
 <button class="reload" id="reload" type="button">最新に更新</button>
 </div>
 </header>
-<div id="body">
+<div id="gate">
+<div class="gatebox">
+<p class="gatelab">このページは合言葉で保護されています</p>
+<form id="gateform">
+<input id="pass" type="password" inputmode="numeric" autocomplete="current-password" placeholder="合言葉" aria-label="合言葉">
+<button type="submit">開く</button>
+</form>
+<p class="gateerr" id="gateerr" hidden>合言葉が違います</p>
+</div>
+</div>
+<div id="body" hidden>
 <div class="seg" role="group" aria-label="集計期間">
 <button id="btnY" aria-pressed="true">年間（計上済み全体）</button>
 <button id="btnE" aria-pressed="false">確定実績の月だけ</button>
@@ -200,7 +223,18 @@ footer b{color:var(--ink-2)}
 </div>
 <script>
 const META = {"months":["5月","6月","7月","8月","9月","10月","11月","12月","1月","2月","3月","4月"],"labels":{"9":"google広告 / 見学予約獲得 / 常設 モデルハウス","10":"google広告 / 見学予約獲得 / 見学会 相談会","15":"meta広告 / 見学予約獲得 / 常設 モデルハウス","16":"meta広告 / 見学予約獲得 / 見学会 相談会","19":"meta広告 / 反響獲得 / 資料請求","20":"meta広告 / 反響獲得 / フォロワー 増やし","32":"チラシ / 印刷費","33":"チラシ / ポスティング費","41":"WEB（SUUMO） / 基本情報","44":"WEB（SUUMO） / 成果報酬分","57":"athome / 物件紹介","58":"のぼり制作費用 / のぼりキング","59":"野立て看板 / 城野高架下 豊陽交差点","61":"ノベルティ","62":"写真撮影 / トライポッド","65":"予備費","66":"景品・その他備品購入"}};
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTRZZbGmdrMUabj5t3YYvaFVq-ZjKcgEUuoo57RZ39yD7Cr45neh-ftHxbzxAtxytmFkYgiVBc3XHhx/pub?gid=0&single=true&output=csv";
+const ENC = {s:"CYvbxO2LwZZlr/BsHspYHQ==", i:"SV6XkFG7mUSBmb6z", n:200000,
+c:"s1ZP079lA18zhKZ1LDXrDBICoXxbH6mn8KlZZ6t6DUcZ6hfFLuWlv9Eko1cttzcZZ0GhsPHw+Gqeloi+E1UXzQgcTQu4W2Aebm3qyGW7Q21MT45jF+hVR+DyLgCFKA3FxplHCeFoCnzQjt32n6v3yuX8nUsDjHUOGHooyP4oEL7orrdCtINsNXl/txu+UY1bjmpctgnV+8TVmk3MVuQyo3nQQB/AhSYqhP9taEemn6Y="};
+let CSV_URL = null;
+const b64b = b => Uint8Array.from(atob(b), c=>c.charCodeAt(0));
+async function unlockUrl(pass){
+const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+const key = await crypto.subtle.deriveKey(
+{name:'PBKDF2', salt:b64b(ENC.s), iterations:ENC.n, hash:'SHA-256'},
+km, {name:'AES-GCM', length:256}, false, ['decrypt']);
+const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64b(ENC.i)}, key, b64b(ENC.c));
+return new TextDecoder().decode(pt);
+}
 let DATA = null;
 let ELAPSED = 4;
 const M = META.months;
@@ -689,7 +723,7 @@ html+=`<tr><td style="padding-left:22px;color:var(--ink-2)">${r.name}</td>
 html+=`<tr class="total"><td>合計（明細計上分）</td><td>${yen(TB)}</td><td>${yen(TA)}</td><td>${yen(TB-TA)}</td><td style="text-align:right">${pct(TA/TB)}</td></tr>`;
 document.getElementById('items').innerHTML=html+'</tbody>';
 }
-function renderAll(){ recalcAgg(); renderCards(); renderGauge(); renderMonthly(); renderCum();
+function renderAll(){ if(!DATA) return; recalcAgg(); renderCards(); renderGauge(); renderMonthly(); renderCum();
 renderCat(); renderMRate(); renderMatrix(); renderCPA(); renderPerf(); renderItems(); }
 function setStatus(kind, msg){
 const el=document.getElementById('status');
@@ -711,10 +745,36 @@ if(!DATA) document.getElementById('body').style.display='none';
 }
 }
 document.getElementById('reload').onclick = load;
+const gate=document.getElementById('gate'), gerr=document.getElementById('gateerr');
+async function tryUnlock(pass){
+let url;
+try{ url = await unlockUrl(pass); }
+catch(e){ return false; }
+if(!/^https:\/\/docs\.google\.com\//.test(url)) return false;
+CSV_URL = url;
+gate.hidden = true;
+document.getElementById('body').hidden = false;
+document.getElementById('statusrow').hidden = false;
+try{ sessionStorage.setItem('thk_ad_pass', pass); }catch(e){}
+await load();
+return true;
+}
+document.getElementById('gateform').addEventListener('submit', async e=>{
+e.preventDefault();
+const btn=e.target.querySelector('button'), inp=document.getElementById('pass');
+btn.disabled=true; gerr.hidden=true;
+const ok = await tryUnlock(inp.value.trim());
+btn.disabled=false;
+if(!ok){ gerr.hidden=false; inp.select(); }
+});
+(async ()=>{
+let saved=null; try{ saved = sessionStorage.getItem('thk_ad_pass'); }catch(e){}
+if(saved) await tryUnlock(saved);
+if(gate.hidden===false) document.getElementById('pass').focus();
+})();
 document.getElementById('btnY').onclick=()=>{mode='year';setSeg();renderAll();};
 document.getElementById('btnE').onclick=()=>{mode='elapsed';setSeg();renderAll();};
 function setSeg(){ document.getElementById('btnY').setAttribute('aria-pressed',mode==='year');
 document.getElementById('btnE').setAttribute('aria-pressed',mode==='elapsed'); }
-load();
 let rt; addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(renderAll,180);});
 </script>

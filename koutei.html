@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THE HAUS 工程進捗ダッシュボード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EFEFEA; --card:#FFFFFF; --ink:#181D1A; --muted:#6C736E; --rule:#D9DAD3;
+  --sales:#1F6E6B; --design:#3D5A98; --ic:#8E4A6E; --const:#A2701F; --hand:#5E6B57;
+  --late:#B0432C; --ok:#2E7D5B;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  font-size:15px; line-height:1.65; -webkit-font-smoothing:antialiased;
+  font-feature-settings:"palt" 1;
+}
+.wrap{max-width:1120px;margin:0 auto;padding:36px 24px 96px}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+
+/* header */
+header{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;justify-content:space-between;
+  padding-bottom:20px;border-bottom:2px solid var(--ink)}
+h1{font-size:27px;font-weight:700;margin:0;letter-spacing:.01em}
+.sub{color:var(--muted);font-size:13.5px;margin-top:5px}
+.count{text-align:right;line-height:1.2}
+.count b{font-size:40px;font-weight:700;display:block}
+.count span{font-size:12.5px;color:var(--muted)}
+
+/* filters */
+.filters{display:flex;flex-wrap:wrap;gap:26px;margin:20px 0 34px}
+.fgroup{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fgroup>i{font-style:normal;font-size:12px;color:var(--muted);margin-right:2px}
+select.sel{font:inherit;font-size:13.5px;padding:7px 34px 7px 12px;border:1px solid var(--rule);
+  background:var(--card);color:var(--ink);cursor:pointer;border-radius:2px;min-width:150px;
+  appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='11' height='7'><path d='M1 1l4.5 4.5L10 1' fill='none' stroke='%236C736E' stroke-width='1.6'/></svg>");
+  background-repeat:no-repeat;background-position:right 12px center}
+select.sel:hover{border-color:var(--ink)}
+select.sel:focus-visible{outline:2px solid var(--sales);outline-offset:2px}
+
+h2{font-size:16px;font-weight:700;margin:0 0 4px}
+.note{font-size:12.5px;color:var(--muted);margin:0 0 16px}
+section{margin-bottom:52px}
+
+/* pipeline */
+.pipe{background:var(--card);border:1px solid var(--rule);padding:26px 26px 20px}
+.pipebar{display:flex;height:56px;width:100%;overflow:hidden}
+.seg{position:relative;display:flex;align-items:center;justify-content:center;color:#fff;min-width:2px}
+.seg b{font-size:19px;font-weight:700}
+.seg em{font-style:normal;font-size:11px;opacity:.85;margin-left:3px}
+.legend{margin-top:20px;border-top:1px solid var(--rule)}
+.lg{display:grid;grid-template-columns:14px 1fr 110px;gap:0 14px;align-items:start;
+  padding:14px 0;border-bottom:1px solid var(--rule)}
+.lg>i{width:14px;height:14px;display:block;margin-top:4px}
+.lg .who{font-size:11.5px;color:var(--muted);margin-bottom:1px}
+.lg .ttl{font-size:14.5px;font-weight:500}
+.lg .desc{font-size:12.5px;color:var(--muted);margin-top:2px;max-width:60ch}
+.lg .amt{text-align:right;line-height:1.25}
+.lg .amt b{font-size:25px;font-weight:700}
+.lg .amt s{text-decoration:none;font-size:13px;font-weight:500;margin-left:2px}
+.lg .amt span{display:block;font-size:11.5px;color:var(--muted)}
+.pipefoot{display:flex;justify-content:space-between;align-items:baseline;margin-top:22px;
+  padding-top:16px;border-top:1px solid var(--rule);flex-wrap:wrap;gap:12px}
+.total b{font-size:34px;font-weight:700}
+.total span{font-size:13px;color:var(--muted);margin-left:6px}
+
+/* kpi */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--rule);
+  border:1px solid var(--rule)}
+.kpi{background:var(--card);padding:16px 18px}
+.kpi .k{font-size:12.5px;color:var(--muted)}
+.kpi .v{font-size:31px;font-weight:700;line-height:1.25}
+.kpi .v s{text-decoration:none;font-size:14px;font-weight:500;color:var(--muted);margin-left:3px}
+.kpi .m{font-size:11.5px;color:var(--muted)}
+
+/* delay */
+.delays{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.dl{background:var(--card);border:1px solid var(--rule);padding:15px 17px}
+.dl .k{font-size:13px;font-weight:500}
+.dl .v{font-size:27px;font-weight:700;color:var(--late)}
+.dl .v.ok{color:var(--ok)}
+.dl .m{font-size:11.5px;color:var(--muted)}
+.dlbar{height:6px;background:#E7E7E1;margin:9px 0 7px;position:relative}
+.dlbar i{position:absolute;left:0;top:0;bottom:0;background:var(--late);display:block}
+
+/* person blocks */
+.block{background:var(--card);border:1px solid var(--rule);padding:22px 24px 18px;margin-bottom:18px}
+.bhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.btag{font-size:12px;font-weight:700;color:#fff;padding:3px 9px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+button.tab{font:inherit;font-size:12.5px;padding:4px 11px;border:1px solid var(--rule);background:transparent;
+  cursor:pointer;color:var(--muted)}
+button.tab[aria-pressed="true"]{background:#EDEDE7;color:var(--ink);border-color:var(--ink)}
+button.tab:focus-visible{outline:2px solid var(--sales);outline-offset:2px}
+.rows{display:flex;flex-direction:column;gap:7px}
+.row{display:grid;grid-template-columns:14px 132px 1fr 92px;align-items:center;gap:12px;
+  width:100%;background:none;border:none;font:inherit;color:inherit;padding:2px 0;cursor:pointer;text-align:left}
+.row:hover .rname{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.row:focus-visible{outline:2px solid var(--sales);outline-offset:2px}
+.caret{font-size:10px;color:var(--muted);transition:transform .12s;line-height:1}
+.row[aria-expanded="true"] .caret{transform:rotate(90deg)}
+.detail{margin:2px 0 10px 158px;border-left:2px solid var(--rule);padding:2px 0 2px 14px}
+.detail div{display:grid;grid-template-columns:1fr 70px;gap:10px;font-size:12.5px;
+  color:var(--muted);padding:3px 0}
+.detail div span:last-child{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+.detail .dh{font-size:11.5px;padding-bottom:4px}
+.rname{font-size:13.5px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rtrack{background:#EDEDE7;height:23px;position:relative}
+.rtrack i{position:absolute;left:0;top:0;bottom:0;display:block}
+.rtrack u{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--ink);opacity:.45;text-decoration:none}
+.rval{font-size:13.5px}
+.rval b{font-size:17px;font-weight:700}
+.rval span{color:var(--muted);font-size:11.5px;margin-left:4px}
+.avgnote{font-size:11.5px;color:var(--muted);margin-top:11px}
+.empty{font-size:13px;color:var(--muted);padding:6px 0}
+
+/* table */
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--rule)}
+th,td{text-align:left;padding:9px 12px;font-size:13px;border-bottom:1px solid var(--rule);vertical-align:middle}
+th{font-size:11.5px;color:var(--muted);font-weight:500;background:#F7F7F3;position:sticky;top:0}
+tbody tr:last-child td{border-bottom:none}
+td.n{font-variant-numeric:tabular-nums}
+.phase{display:inline-block;font-size:11.5px;color:#fff;padding:2px 8px;white-space:nowrap}
+.scroll{max-height:520px;overflow:auto;border:1px solid var(--rule)}
+.scroll table{border:none}
+#gate{min-height:70vh;display:flex;align-items:center;justify-content:center;padding:40px 0}
+.gatebox{background:var(--card);border:1px solid var(--rule);padding:34px 34px 30px;max-width:420px;width:100%}
+.gatebox h2{font-size:18px;margin-bottom:6px}
+.gatebox p{font-size:13px;color:var(--muted);margin:0 0 20px}
+.gatebox input{font:inherit;font-size:15px;width:100%;padding:10px 12px;border:1px solid var(--rule);
+  background:var(--paper);border-radius:2px}
+.gatebox input:focus-visible{outline:2px solid var(--sales);outline-offset:1px}
+.gatebox button{font:inherit;font-size:14px;font-weight:500;margin-top:12px;width:100%;padding:11px;
+  background:var(--ink);color:var(--paper);border:none;border-radius:2px;cursor:pointer}
+.gatebox button:hover{background:var(--sales)}
+.gatebox button:disabled{opacity:.5;cursor:default}
+.gerr{font-size:13px;color:var(--late);margin-top:12px;min-height:1.2em}
+#app[hidden]{display:none}
+footer{font-size:12px;color:var(--muted);border-top:1px solid var(--rule);padding-top:16px;margin-top:40px}
+@media(max-width:640px){
+  .row{grid-template-columns:96px 1fr 78px;gap:8px}
+  .seg b{font-size:15px}
+  h1{font-size:22px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div id="gate">
+  <div class="gatebox">
+    <h2>THE HAUS 工程進捗ダッシュボード</h2>
+    <p>お客様のお名前が含まれるため、合言葉を入れてください。</p>
+    <input id="pw" type="password" placeholder="合言葉" inputmode="numeric" autocomplete="off" spellcheck="false">
+    <button id="unlock">ひらく</button>
+    <div class="gerr" id="gerr"></div>
+  </div>
+</div>
+
+<div id="app" hidden>
+
+<header>
+  <div>
+    <h1>THE HAUS 工程進捗ダッシュボード</h1>
+    <div class="sub">全体スケジュールの実施日から、担当ごとの所要日数と予定とのズレを集計しています</div>
+  </div>
+  <div class="count"><b class="num" id="nProj">0</b><span>集計対象の棟数</span></div>
+</header>
+
+<div class="filters">
+  <div class="fgroup"><i>期</i><select class="sel" id="fPeriod"></select></div>
+  <div class="fgroup"><i>エリア</i><select class="sel" id="fArea"></select></div>
+  <div class="fgroup"><i>商品</i><select class="sel" id="fType"></select></div>
+</div>
+
+<section>
+  <h2>標準的な流れ</h2>
+  <p class="note">設計申込から引渡しまでを5つの区間に分け、それぞれの平均日数を帯の長さで表しています。</p>
+  <div class="pipe">
+    <div class="pipebar" id="pipeBar"></div>
+    <div class="legend" id="pipeAxis"></div>
+    <div class="pipefoot">
+      <div class="total"><b class="num" id="totalDays">–</b><span>日 — 設計申込から引渡しまでの平均（実績のある棟のみ）</span></div>
+      <div class="note" style="margin:0" id="totalN"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>主要な日数</h2>
+  <div class="kpis" id="kpis"></div>
+</section>
+
+<section>
+  <h2>予定日と実施日のズレ</h2>
+  <p class="note">プラスは予定より後ろ倒しになった日数です。中央値で見ています。</p>
+  <div class="delays" id="delays"></div>
+</section>
+
+<section>
+  <h2>担当者別の所要日数</h2>
+  <p class="note">棒の中の縦線は全体平均です。担当者名を押すと、その内訳の物件名と日数が出ます。件数が少ない担当者は数字が振れやすいので、かっこ内の件数と合わせて見てください。</p>
+  <div id="blocks"></div>
+</section>
+
+<section>
+  <h2>物件ごとの現在地</h2>
+  <p class="note">最後に実施日が入っている工程と、そこからの経過日数です。経過が長い案件は工程が止まっているか、実施日の入力が抜けています。</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>物件</th><th>期</th><th>エリア</th><th>直近の工程</th><th>経過</th><th>営業</th><th>設計</th><th>IC</th><th>工事</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<footer id="foot"></footer>
+</div>
+</div>
+
+<script>
+const SECRET = {"s": "f/1kKyzoiFex0DiaUDT+tg==", "i": "JrMIJp5e13bIhZvE", "c": "b2h/oewXhwGl44038LZPd4X9kESGf3JyzJXab7Xx6yvPLRr9Khi2fWSr1TfOE0PWYm9VAWYItqML42vma0gXOr7bknXB7FJxFku5/RcBiZeIeTp2v9A3FI3FICmQd0Rqd67Dm2ct1wzBvAzTx+0BeBMvPp0cEVE="};
+const MIL = ['設計申込','ヒアリング','プラン確定','請負契約','IC初回','IC完了','三者打合','確認申請','着工','上棟','竣工','引渡し'];
+const COL = {
+  '設計申込':['設計申込予定日','設計申込実施日'], 'ヒアリング':['ヒアリング予定日','ヒアリング実施日'],
+  'プラン確定':['プラン確定予定日','プラン確定実施日'], '請負契約':['請負契約予定日','請負契約実施日'],
+  'IC初回':['ＩＣ初回予定日','ＩＣ初回実施日'], 'IC完了':['ＩＣ完了予定日','ＩＣ完了実施日'],
+  '三者打合':['3者打合予定日','３者打合実施日'], '確認申請':['確認申請予定日','確認申請実施日'],
+  '着工':['着工予定日','着工実施日'], '上棟':['上棟予定日','上棟実施日'],
+  '竣工':['建物竣工予定日','建物竣工実施日'], '引渡し':['引渡し予定日','引渡し実施日'],
+};
+let P = [], GEN = '';
+
+/* ---------- 合言葉と読み込み ---------- */
+const b64 = s => Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+async function unlock(pass){
+  const enc = new TextEncoder();
+  const base = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt:b64(SECRET.s), iterations:300000, hash:'SHA-256'},
+    base, {name:'AES-GCM', length:256}, false, ['decrypt']);
+  const out = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64(SECRET.i)}, key, b64(SECRET.c));
+  return new TextDecoder().decode(out);
+}
+
+function parseCSV(txt){
+  const rows=[]; let row=[], f='', q=false;
+  for(let i=0;i<txt.length;i++){
+    const c=txt[i];
+    if(q){ if(c==='"'){ if(txt[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(f); f=''; }
+    else if(c==='\n'){ row.push(f); f=''; rows.push(row); row=[]; }
+    else if(c!=='\r') f+=c;
+  }
+  if(f!==''||row.length){ row.push(f); rows.push(row); }
+  return rows;
+}
+
+function toISO(s){
+  s=(s||'').trim(); if(!s) return null;
+  let m=s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+  if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m) return `${m[3]}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
+  return null;
+}
+
+function build(rows){
+  const head = rows[0].map(h=>h.replace(/[\r\n]/g,'').trim());
+  const ix = n => head.indexOf(n);
+  const g = (r,n) => { const i=ix(n); return i<0 ? '' : (r[i]||'').trim(); };
+  const out=[];
+  for(let k=1;k<rows.length;k++){
+    const r=rows[k];
+    const name=g(r,'物件名'); if(!name) continue;
+    let ki=g(r,'竣工予定'); if(ki==='失注') continue;
+    if(ki==='設計申込'||!ki) ki='期未定';
+    const o={名前:name, 期:ki, エリア:g(r,'打合せ場所')||'未設定', 種別:g(r,'商品種別')||'未設定',
+      営業:g(r,'営業担当')||'未設定', 設計:g(r,'設計担当')||'未設定',
+      IC:g(r,'I C担当')||'未設定', 工事:g(r,'工事担当')||'未設定'};
+    MIL.forEach(m=>{ o['p_'+m]=toISO(g(r,COL[m][0])); o['a_'+m]=toISO(g(r,COL[m][1])); });
+    out.push(o);
+  }
+  return out;
+}
+
+async function start(){
+  const pw=document.getElementById('pw'), btn=document.getElementById('unlock'), err=document.getElementById('gerr');
+  btn.disabled=true; err.textContent='読み込んでいます…';
+  let url;
+  try { url = await unlock(pw.value.trim()); }
+  catch(e){ err.textContent='合言葉が違うようです。'; btn.disabled=false; return; }
+  try {
+    const res = await fetch(url, {cache:'no-store'});
+    if(!res.ok) throw new Error(res.status);
+    P = build(parseCSV(await res.text()));
+    if(!P.length) throw new Error('empty');
+    const now=new Date();
+    GEN = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')} 時点`;
+    document.getElementById('gate').hidden=true;
+    document.getElementById('app').hidden=false;
+    chips('fPeriod','期'); chips('fArea','エリア'); chips('fType','種別');
+    render();
+  } catch(e){
+    err.textContent='スプレッドシートを読み込めませんでした（'+e.message+'）。時間をおいて開き直してください。';
+    btn.disabled=false;
+  }
+}
+document.getElementById('unlock').onclick=start;
+document.getElementById('pw').onkeydown=e=>{ if(e.key==='Enter') start(); };
+
+const C = {営業:'var(--sales)', 設計:'var(--design)', IC:'var(--ic)', 工事:'var(--const)', 引渡:'var(--hand)'};
+
+/* ---------- helpers ---------- */
+const d = s => s ? new Date(s+'T00:00:00') : null;
+const days = (a,b) => { const x=d(a), y=d(b); if(!x||!y) return null;
+  const n = Math.round((y-x)/86400000); return (n<0 || n>760) ? null : n; };
+const raw  = (a,b) => { const x=d(a), y=d(b); if(!x||!y) return null;
+  const n = Math.round((y-x)/86400000); return (n<-400 || n>760) ? null : n; };
+const mean = a => a.length ? a.reduce((s,v)=>s+v,0)/a.length : null;
+const med  = a => { if(!a.length) return null; const s=[...a].sort((x,y)=>x-y), h=s.length>>1;
+  return s.length%2 ? s[h] : (s[h-1]+s[h])/2; };
+const r0 = v => v===null ? '–' : Math.round(v).toLocaleString('ja-JP');
+
+/* 区間定義 */
+const SEG = [
+  {name:'設計申込 → 請負契約', who:'営業', from:'設計申込', to:'請負契約', role:'営業',
+   desc:'設計申込をいただいてから、土地とプランを固めて請負契約を結ぶまで'},
+  {name:'請負契約 → IC完了', who:'IC', from:'請負契約', to:'IC完了', role:'IC',
+   desc:'契約後、内装・設備の仕様をお客様と打ち合わせて決めきるまで'},
+  {name:'IC完了 → 着工', who:'設計・工務', from:'IC完了', to:'着工', role:'設計',
+   desc:'仕様が固まってから、確認申請や着工準備を終えて現場に入るまで'},
+  {name:'着工 → 竣工', who:'工事', from:'着工', to:'竣工', role:'工事',
+   desc:'基礎から上棟、内外装まで、建物が完成するまでの工事期間'},
+  {name:'竣工 → 引渡し', who:'工事・営業', from:'竣工', to:'引渡し', role:'引渡',
+   desc:'完成後、完了検査や手直し、清算を終えて鍵をお渡しするまで'},
+];
+
+const METRICS = {
+  営業:[
+    {t:'設計申込 → 請負契約', f:'設計申込', o:'請負契約'},
+    {t:'設計申込 → ヒアリング', f:'設計申込', o:'ヒアリング'},
+    {t:'ヒアリング → 請負契約', f:'ヒアリング', o:'請負契約'},
+  ],
+  設計:[
+    {t:'ヒアリング → プラン確定', f:'ヒアリング', o:'プラン確定'},
+    {t:'プラン確定 → 確認申請', f:'プラン確定', o:'確認申請'},
+    {t:'請負契約 → 着工', f:'請負契約', o:'着工'},
+  ],
+  IC:[
+    {t:'IC初回 → IC完了', f:'IC初回', o:'IC完了'},
+    {t:'請負契約 → IC初回', f:'請負契約', o:'IC初回'},
+    {t:'請負契約 → IC完了', f:'請負契約', o:'IC完了'},
+  ],
+  工事:[
+    {t:'着工 → 竣工', f:'着工', o:'竣工'},
+    {t:'着工 → 上棟', f:'着工', o:'上棟'},
+    {t:'上棟 → 竣工', f:'上棟', o:'竣工'},
+    {t:'竣工 → 引渡し', f:'竣工', o:'引渡し'},
+    {t:'着工の遅れ（予定比）', delay:'着工'},
+    {t:'竣工の遅れ（予定比）', delay:'竣工'},
+  ],
+};
+
+/* ---------- filters ---------- */
+const uniq = k => [...new Set(P.map(p=>p[k]))].sort((a,b)=>a.localeCompare(b,'ja'));
+const ALL='__ALL__';
+const state = {期:ALL, エリア:ALL, 種別:ALL, tab:{}, open:{}};
+Object.keys(METRICS).forEach(k=>{state.tab[k]=0; state.open[k]=null;});
+
+function chips(hostId, key){
+  const sel=document.getElementById(hostId);
+  const opts = [[ALL,'すべて']].concat(uniq(key).map(v=>[v, `${v}（${P.filter(p=>p[key]===v).length}）`]));
+  sel.innerHTML = opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  sel.onchange = ()=>{ state[key]=sel.value; render(); };
+}
+const hit = (key,v) => state[key]===ALL || state[key]===v;
+const rows = () => P.filter(p=>hit('期',p.期)&&hit('エリア',p.エリア)&&hit('種別',p.種別));
+
+/* ---------- render ---------- */
+function render(){
+  const R = rows();
+  document.getElementById('nProj').textContent = R.length;
+
+  /* pipeline */
+  const segv = SEG.map(s=>{
+    const v = R.map(p=>days(p['a_'+s.from], p['a_'+s.to])).filter(x=>x!==null);
+    return {...s, avg:mean(v), n:v.length, med:med(v)};
+  });
+  const tot = segv.reduce((s,x)=>s+(x.avg||0),0) || 1;
+  const bar=document.getElementById('pipeBar'), ax=document.getElementById('pipeAxis');
+  bar.innerHTML=''; ax.innerHTML='';
+  segv.forEach(s=>{
+    const w = Math.max((s.avg||0)/tot*100, 0);
+    const el=document.createElement('div'); el.className='seg';
+    el.style.flex = `0 0 ${w}%`; el.style.background=C[s.role];
+    el.title = `${s.name}｜平均 ${r0(s.avg)}日（${s.n}棟）`;
+    el.innerHTML = w>6 ? `<b class="num">${r0(s.avg)}</b><em>日</em>` : '';
+    bar.appendChild(el);
+    const a=document.createElement('div'); a.className='lg';
+    a.innerHTML = `<i style="background:${C[s.role]}"></i>
+      <div><div class="who">${s.who}</div><div class="ttl">${s.name}</div>
+        <div class="desc">${s.desc}</div></div>
+      <div class="amt"><b class="num" style="color:${C[s.role]}">${r0(s.avg)}</b><s>日</s>
+        <span class="num">${s.n}棟・中央値 ${r0(s.med)}日</span></div>`;
+    ax.appendChild(a);
+  });
+  const full = R.map(p=>days(p.a_設計申込,p.a_引渡し)).filter(x=>x!==null);
+  document.getElementById('totalDays').textContent = r0(mean(full));
+  document.getElementById('totalN').textContent =
+    full.length ? `実績 ${full.length}棟／中央値 ${r0(med(full))}日・最短 ${r0(Math.min(...full))}日・最長 ${r0(Math.max(...full))}日` : 'この条件では引渡し済みの実績がありません';
+
+  /* KPI */
+  const kdef=[
+    {k:'営業日数',   s:'設計申込 → 請負契約', f:'設計申込', o:'請負契約', c:C.営業},
+    {k:'IC日数',     s:'IC初回 → IC完了',     f:'IC初回',   o:'IC完了',   c:C.IC},
+    {k:'工事日数',   s:'着工 → 竣工',          f:'着工',     o:'竣工',     c:C.工事},
+    {k:'上棟までの日数', s:'着工 → 上棟',      f:'着工',     o:'上棟',     c:C.工事},
+    {k:'引渡しまで', s:'竣工 → 引渡し',        f:'竣工',     o:'引渡し',   c:C.引渡},
+  ];
+  document.getElementById('kpis').innerHTML = kdef.map(x=>{
+    const v=R.map(p=>days(p['a_'+x.f],p['a_'+x.o])).filter(y=>y!==null);
+    return `<div class="kpi"><div class="k">${x.k}</div>
+      <div class="v num" style="color:${x.c}">${r0(mean(v))}<s>日</s></div>
+      <div class="m">${x.s}｜${v.length}棟・中央値 ${r0(med(v))}日</div></div>`;
+  }).join('');
+
+  /* delays */
+  const ddef=['請負契約','IC完了','着工','上棟','竣工','引渡し'];
+  const dvals = ddef.map(m=>{
+    const v=R.map(p=>raw(p['p_'+m],p['a_'+m])).filter(x=>x!==null);
+    return {m, med:med(v), n:v.length, late:v.filter(x=>x>7).length};
+  });
+  const dmax = Math.max(...dvals.map(x=>Math.abs(x.med||0)),1);
+  document.getElementById('delays').innerHTML = dvals.map(x=>{
+    const late = (x.med||0) > 3;
+    return `<div class="dl"><div class="k">${x.m}</div>
+      <div class="v num ${late?'':'ok'}">${x.med===null?'–':(x.med>0?'+':'')+r0(x.med)}<s style="font-size:14px;font-weight:500"> 日</s></div>
+      <div class="dlbar"><i style="width:${Math.min(Math.abs(x.med||0)/dmax*100,100)}%;background:${late?'var(--late)':'var(--ok)'}"></i></div>
+      <div class="m">${x.n}棟中 ${x.late}棟が1週間以上おくれ</div></div>`;
+  }).join('');
+
+  /* per-person blocks */
+  const host=document.getElementById('blocks'); host.innerHTML='';
+  Object.keys(METRICS).forEach(role=>{
+    const mIdx = state.tab[role], m = METRICS[role][mIdx];
+    const groups = {};
+    R.forEach(p=>{
+      const who = p[role]; if(!who) return;
+      const v = m.delay ? raw(p['p_'+m.delay], p['a_'+m.delay]) : days(p['a_'+m.f], p['a_'+m.o]);
+      if(v===null) return;
+      (groups[who] ||= []).push({名前:p.名前, 期:p.期, v});
+    });
+    const list = Object.entries(groups)
+      .map(([who,items])=>({who, items:[...items].sort((a,b)=>a.v-b.v),
+        avg:mean(items.map(i=>i.v)), n:items.length}))
+      .filter(x=>x.n>0)
+      .sort((a,b)=>a.avg-b.avg);
+    const all = Object.values(groups).flat().map(i=>i.v);
+    const gAvg = mean(all);
+    const mx = Math.max(...list.map(x=>x.avg), gAvg||0, 1);
+
+    const el=document.createElement('div'); el.className='block';
+    el.innerHTML = `<div class="bhead">
+        <span class="btag" style="background:${C[role]}">${role}担当</span>
+        <span style="font-size:13.5px">${m.t}</span>
+        <span class="tabs">${METRICS[role].map((x,i)=>
+          `<button class="tab" data-r="${role}" data-i="${i}" aria-pressed="${i===mIdx}">${x.t}</button>`).join('')}</span>
+      </div>
+      <div class="rows">${
+        list.length ? list.map(x=>{
+          const open = state.open[role]===x.who;
+          return `
+        <button class="row" data-r="${role}" data-w="${x.who}" aria-expanded="${open}">
+          <span class="caret">▶</span>
+          <span class="rname" title="${x.who}">${x.who}</span>
+          <span class="rtrack">
+            <i style="width:${Math.max(Math.abs(x.avg)/mx*100,1)}%;background:${C[role]};opacity:${x.n<3?.45:.9}"></i>
+            ${gAvg!==null?`<u style="left:${Math.abs(gAvg)/mx*100}%"></u>`:''}
+          </span>
+          <span class="rval"><b class="num">${x.avg>0&&m.delay?'+':''}${r0(x.avg)}</b> 日<span>${x.n}件</span></span>
+        </button>
+        ${open?`<div class="detail"><div class="dh"><span>物件名</span><span>日数</span></div>${
+          x.items.map(i=>`<div><span>${i.名前}<em style="font-style:normal;opacity:.7"> ／ ${i.期}</em></span>
+            <span>${i.v>0&&m.delay?'+':''}${i.v.toLocaleString('ja-JP')} 日</span></div>`).join('')
+        }</div>`:''}`;
+        }).join('') : '<div class="empty">この条件では実績データがありません</div>'
+      }</div>
+      <div class="avgnote">全体平均 ${r0(gAvg)}日（${all.length}件）／薄い棒は3件未満で参考値です</div>`;
+    host.appendChild(el);
+  });
+  host.querySelectorAll('button.tab').forEach(b=>{
+    b.onclick=()=>{ state.tab[b.dataset.r]=+b.dataset.i; state.open[b.dataset.r]=null; render(); };
+  });
+  host.querySelectorAll('button.row').forEach(b=>{
+    b.onclick=()=>{ const r=b.dataset.r;
+      state.open[r] = state.open[r]===b.dataset.w ? null : b.dataset.w; render(); };
+  });
+
+  /* table */
+  const today = new Date();
+  const tb = R.map(p=>{
+    let last=null;
+    MIL.forEach(m=>{ if(p['a_'+m]) last=m; });
+    const done = last==='引渡し';
+    const el = last ? Math.round((today - d(p['a_'+last]))/86400000) : null;
+    return {p, last, el, done};
+  }).sort((a,b)=>{
+    if(a.done!==b.done) return a.done?1:-1;
+    return (b.el??-1e9)-(a.el??-1e9);
+  });
+  const roleOf = m => ['設計申込','ヒアリング','プラン確定','請負契約'].includes(m) ? '営業'
+    : ['IC初回','IC完了','三者打合'].includes(m) ? 'IC'
+    : ['確認申請'].includes(m) ? '設計'
+    : m==='引渡し' ? '引渡' : '工事';
+  document.getElementById('tbody').innerHTML = tb.map(x=>`
+    <tr>
+      <td>${x.p.名前}</td><td>${x.p.期}</td><td>${x.p.エリア}</td>
+      <td>${x.last?`<span class="phase" style="background:${C[roleOf(x.last)]}">${x.last}</span>`:'<span style="color:var(--muted)">未着手</span>'}</td>
+      <td class="n">${x.el===null?'–':(x.done?'引渡済':x.el.toLocaleString('ja-JP')+'日')}</td>
+      <td>${x.p.営業}</td><td>${x.p.設計}</td><td>${x.p.IC}</td><td>${x.p.工事}</td>
+    </tr>`).join('');
+
+  document.getElementById('foot').textContent =
+    `出典：Google スプレッドシート「THE HAUS_全体スケジュール」の実施日・予定日／${GEN}に読み込み／` +
+    `マイナスの日数や2年を超える極端な値は入力ミスとみなして集計から除いています。`;
+}
+
+</script>
+</body>
+</html>

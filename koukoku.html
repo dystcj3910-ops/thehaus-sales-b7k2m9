@@ -1,0 +1,720 @@
+<title>広告費ダッシュボード</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root{
+color-scheme: light;
+--plane:#f9f9f7; --surface:#fcfcfb; --surface-2:#f2f1ed;
+--ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+--grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+--s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+--good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+--budget:#d6d4cc;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+color-scheme: dark;
+--plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
+--ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+--grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+--s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+--budget:#3e3e3a;
+}}
+:root[data-theme="dark"]{
+color-scheme: dark;
+--plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
+--ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+--grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+--s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+--budget:#3e3e3a;
+}
+*{box-sizing:border-box}
+body{background:var(--plane); color:var(--ink);
+font-family:"Noto Sans JP",system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif;
+font-size:14px; line-height:1.65;}
+h1,h2,.card .val,.seg button,tr.total td,tr.grp td{
+font-family:"Zen Kaku Gothic New","Noto Sans JP",system-ui,sans-serif;}
+.wrap{max-width:1120px; margin:0 auto; padding-block:28px 64px; padding-left:20px; padding-right:20px;}
+header h1{font-size:25px; font-weight:700; margin:0 0 4px; letter-spacing:.005em}
+.sub{color:var(--ink-2); font-size:13px; margin:0}
+.meta{color:var(--muted); font-size:12px; margin:6px 0 0}
+.seg{display:inline-flex; gap:2px; background:var(--surface-2); border-radius:10px; padding:3px; margin:20px 0 4px}
+.seg button{appearance:none; border:0; background:transparent; color:var(--ink-2);
+font:inherit; font-size:13px; padding:6px 14px; border-radius:8px; cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface); color:var(--ink); font-weight:600;
+box-shadow:0 1px 2px rgba(0,0,0,.08), 0 0 0 1px var(--ring)}
+.segnote{color:var(--muted); font-size:12px; margin:2px 0 18px}
+.statusrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px}
+.status{font-size:12px; padding:3px 10px; border-radius:999px; font-weight:500}
+.status.loading{background:var(--surface-2); color:var(--ink-2)}
+.status.ok{background:rgba(12,163,12,.13); color:var(--good)}
+.status.warn{background:rgba(250,178,25,.18); color:#8a6000}
+:root[data-theme="dark"] .status.warn, :root:not([data-theme="light"]) .status.warn{color:var(--warn)}
+.reload{appearance:none; border:1px solid var(--ring); background:var(--surface); color:var(--ink-2);
+font:inherit; font-size:12px; padding:4px 12px; border-radius:999px; cursor:pointer}
+.reload:hover{background:var(--surface-2); color:var(--ink)}
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(192px,1fr)); gap:12px; margin-bottom:22px}
+.card{background:var(--surface); border:1px solid var(--ring); border-radius:12px; padding:14px 16px}
+.card .lab{font-size:12px; color:var(--ink-2); margin-bottom:6px}
+.card .val{font-size:26px; font-weight:700; letter-spacing:-.015em; line-height:1.15; font-variant-numeric:tabular-nums}
+.card .note{font-size:12px; color:var(--muted); margin-top:5px}
+.pill{display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:600;
+padding:2px 8px; border-radius:999px; margin-top:7px}
+.pill.good{background:rgba(12,163,12,.13); color:var(--good)}
+.pill.warn{background:rgba(250,178,25,.18); color:#8a6000}
+.pill.crit{background:rgba(208,59,59,.13); color:var(--crit)}
+:root[data-theme="dark"] .pill.warn,
+:root:not([data-theme="light"]) .pill.warn{color:var(--warn)}
+section{background:var(--surface); border:1px solid var(--ring); border-radius:12px;
+padding:18px 18px 14px; margin-bottom:18px}
+section h2{font-size:15.5px; margin:0 0 3px; font-weight:700; letter-spacing:.005em}
+section .desc{font-size:12.5px; color:var(--ink-2); margin:0 0 14px}
+.legend{display:flex; flex-wrap:wrap; gap:14px; margin:0 0 10px; font-size:12px; color:var(--ink-2)}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+.sw{width:12px; height:12px; border-radius:3px; display:inline-block}
+.sw.line{height:3px; border-radius:2px; width:16px}
+.chart{position:relative; width:100%}
+.chart svg{display:block; width:100%; height:auto}
+.tt{position:absolute; pointer-events:none; z-index:5; background:var(--surface);
+border:1px solid var(--ring); border-radius:8px; padding:8px 10px; font-size:12px;
+box-shadow:0 4px 16px rgba(0,0,0,.14); white-space:nowrap; opacity:0; transition:opacity .08s}
+.tt b{font-weight:650}
+.tt .row{display:flex; justify-content:space-between; gap:14px; font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto; margin-top:4px}
+table{border-collapse:collapse; width:100%; font-size:13px; min-width:560px}
+th,td{padding:8px 10px; text-align:right; border-bottom:1px solid var(--grid); font-variant-numeric:tabular-nums}
+th{font-size:11.5px; color:var(--muted); font-weight:600; text-align:right; white-space:nowrap}
+th:first-child, td:first-child{text-align:left; font-variant-numeric:normal}
+tbody tr:hover{background:var(--surface-2)}
+tr.grp td{background:var(--surface-2); font-weight:650; font-size:12px; color:var(--ink-2)}
+tr.total td{font-weight:650; border-top:2px solid var(--axis)}
+.bar{position:relative; height:8px; width:88px; background:var(--budget); border-radius:4px; display:inline-block; vertical-align:middle}
+.bar i{position:absolute; inset:0 auto 0 0; border-radius:4px; background:var(--s1); display:block}
+.bar i.over{background:var(--crit)}
+.cell-rate{display:flex; align-items:center; gap:9px; justify-content:flex-end}
+#matrix{min-width:820px}
+#matrix th{text-align:center}
+#matrix td.mx{text-align:center; padding:7px 6px; border-left:1px solid var(--surface); border-right:1px solid var(--surface)}
+#matrix td:first-child{white-space:nowrap; font-weight:500}
+#matrix .mxv{font-size:12.5px; font-variant-numeric:tabular-nums}
+footer{color:var(--muted); font-size:12px; margin-top:26px; line-height:1.8}
+footer b{color:var(--ink-2)}
+@media (max-width:560px){ .card .val{font-size:22px} header h1{font-size:20px} }
+</style>
+<div class="wrap">
+<header>
+<h1>広告費ダッシュボード</h1>
+<p class="sub">THE HAUS ／ 第18期（2026年5月〜2027年4月）</p>
+<p class="meta">出典：「THEHAUS様_業績管理」の<b>26/27広告宣伝費</b>・<b>25/26業績把握</b>シート（連携シート経由で自動取得）</p>
+<div class="statusrow">
+<span class="status loading" id="status">読み込み中…</span>
+<button class="reload" id="reload" type="button">最新に更新</button>
+</div>
+</header>
+<div id="body">
+<div class="seg" role="group" aria-label="集計期間">
+<button id="btnY" aria-pressed="true">年間（計上済み全体）</button>
+<button id="btnE" aria-pressed="false">確定実績の月だけ</button>
+</div>
+<p class="segnote" id="segnote"></p>
+<div class="cards" id="cards"></div>
+<section>
+<h2>年間予算の消化状況</h2>
+<p class="desc">バーは年間予算に対する消化。縦の目盛は「時間の経過率」で、消化がペースより早いか遅いかの目安です。</p>
+<div class="chart" id="gauge"></div>
+</section>
+<section>
+<h2>月次 予算 vs 実績</h2>
+<p class="desc" id="monthlydesc"></p>
+<div class="legend">
+<span><i class="sw" style="background:var(--budget)"></i>予算</span>
+<span><i class="sw" style="background:var(--s1)"></i><span id="lgConfirm">実績（確定）</span></span>
+<span><i class="sw" style="background:var(--s1);opacity:.4"></i><span id="lgPlan">実績（予定計上）</span></span>
+</div>
+<div class="chart" id="monthly"></div>
+</section>
+<section>
+<h2>累計の予算 vs 実績</h2>
+<p class="desc">2本の線の開きが「使い残し（または使いすぎ）」の累計額です。</p>
+<div class="legend">
+<span><i class="sw line" style="background:var(--muted)"></i>累計予算</span>
+<span><i class="sw line" style="background:var(--s1)"></i>累計実績</span>
+</div>
+<div class="chart" id="cum"></div>
+</section>
+<section>
+<h2>カテゴリ別の予算と実績</h2>
+<p class="desc" id="catdesc"></p>
+<div class="legend">
+<span><i class="sw" style="background:var(--budget)"></i>予算</span>
+<span><i class="sw" style="background:var(--s1)"></i>実績</span>
+</div>
+<div class="chart" id="cat"></div>
+</section>
+<section>
+<h2>月ごとの予算消化率</h2>
+<p class="desc">その月の予算を何％使ったか。100%の線を超えた月は使いすぎ（赤）。確定していない月は計上予定額ベースです。</p>
+<div class="chart" id="mrate"></div>
+</section>
+<section>
+<h2>カテゴリ×月の消化率マトリクス</h2>
+<p class="desc">色が濃いほど消化が進んでいます。100%超は赤。セルにマウスを乗せると予算と実績が出ます。</p>
+<div class="tablewrap"><table id="matrix"></table></div>
+</section>
+<section>
+<h2>客単価（費対果）の推移</h2>
+<p class="desc">1件あたりいくら広告費がかかったか。社内目標は <b>直接広告費ベース 60,000円/組</b>、<b>全体広告費ベース 100,000円/組</b>（点線）。線が下にあるほど良い状態です。</p>
+<div class="legend">
+<span><i class="sw line" style="background:var(--s1)"></i>反響単価（全体広告費 ÷ 反響数）</span>
+<span><i class="sw line" style="background:var(--s2)"></i>来場単価（全体広告費 ÷ 来場数）</span>
+<span><i class="sw line" style="background:var(--s3)"></i>来場単価（直接広告費 ÷ 来場数）</span>
+</div>
+<div class="chart" id="cpa"></div>
+<div class="tablewrap">
+<table id="cpatable"></table>
+</div>
+</section>
+<section>
+<h2>反響数・来場数（目標 vs 実績）</h2>
+<p class="desc">客単価の分母。件数が伸びないと広告費を使っても単価が悪化します。</p>
+<div class="legend">
+<span><i class="sw" style="background:var(--budget)"></i>目標</span>
+<span><i class="sw" style="background:var(--s1)"></i>反響 実績</span>
+<span><i class="sw" style="background:var(--s2)"></i>来場 実績</span>
+</div>
+<div class="chart" id="perf1"></div>
+<div class="chart" id="perf2" style="margin-top:10px"></div>
+</section>
+<section>
+<h2>明細別の予算消化</h2>
+<p class="desc" id="itemdesc"></p>
+<div class="tablewrap"><table id="items"></table></div>
+</section>
+<footer>
+<b>数字の読み方メモ</b><br>
+・「消化率」＝ 実績 ÷ 予算。100%超はオーバー（赤表示）。<br>
+・「直接広告費」＝ ホームページ流入（Google・Meta・Yahoo・チラシ等）。「間接広告費」＝ SEO・ポータル・HP運営・ブランディング費。<br>
+・先々の月の実績欄には、すでに確定した固定費や発注済みの金額がシートに入力されています。確定実績の月数は上部の表示をご覧ください。<br>
+・設計申込のデータが業績把握シートに未入力のため、申込単価は表示していません（入力されれば追加できます）。
+</footer>
+</div>
+</div>
+<script>
+const META = {"months":["5月","6月","7月","8月","9月","10月","11月","12月","1月","2月","3月","4月"],"labels":{"9":"google広告 / 見学予約獲得 / 常設 モデルハウス","10":"google広告 / 見学予約獲得 / 見学会 相談会","15":"meta広告 / 見学予約獲得 / 常設 モデルハウス","16":"meta広告 / 見学予約獲得 / 見学会 相談会","19":"meta広告 / 反響獲得 / 資料請求","20":"meta広告 / 反響獲得 / フォロワー 増やし","32":"チラシ / 印刷費","33":"チラシ / ポスティング費","41":"WEB（SUUMO） / 基本情報","44":"WEB（SUUMO） / 成果報酬分","57":"athome / 物件紹介","58":"のぼり制作費用 / のぼりキング","59":"野立て看板 / 城野高架下 豊陽交差点","61":"ノベルティ","62":"写真撮影 / トライポッド","65":"予備費","66":"景品・その他備品購入"}};
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTRZZbGmdrMUabj5t3YYvaFVq-ZjKcgEUuoo57RZ39yD7Cr45neh-ftHxbzxAtxytmFkYgiVBc3XHhx/pub?gid=0&single=true&output=csv";
+let DATA = null;
+let ELAPSED = 4;
+const M = META.months;
+/* ===== CSV → DATA ===== */
+function parseCSV(text){
+const rows=[]; let row=[], f='', q=false;
+for(let i=0;i<text.length;i++){
+const c=text[i];
+if(q){
+if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; }
+else f+=c;
+}else{
+if(c==='"') q=true;
+else if(c===','){ row.push(f); f=''; }
+else if(c==='\n'){ row.push(f); rows.push(row); row=[]; f=''; }
+else if(c!=='\r') f+=c;
+}
+}
+row.push(f); rows.push(row);
+return rows;
+}
+const CLEAN = v => String(v==null?'':v).replace(/\s+/g,' ').trim();
+function numOf(v){
+const t = CLEAN(v).replace(/[¥,\s]/g,'');
+if(!t || /^#/.test(t) || t==='-') return null;
+const n = Number(t.replace(/%$/,''));
+return Number.isFinite(n) ? n : null;
+}
+const GROUPS = [['ホームページ流入',9,36],['SEO施策',36,41],['ポータルサイト',41,49],
+['ホームページ運営',49,57],['ブランディング費',57,81]];
+const CATCOL = {'ホームページ流入':3,'SEO施策':4,'ポータルサイト':5,'ホームページ運営':6,'ブランディング費':7};
+const PERF_KEYS = [
+['hankyo_target','反響','単月目標'],['hankyo_shiryo','反響','資料請求'],
+['hankyo_yoyaku','反響','来場予約'],['hankyo_tel','反響','電話メール問合'],
+['hankyo_actual','反響','単月合計'],
+['raijo_target','来場数','単月目標'],['raijo_actual','来場数','単月実績'],
+['ad_direct','広告宣伝費','直接'],['ad_indirect','広告宣伝費','間接'],
+['cpa_hankyo','費対果','反響単価（資請+来予）'],['cpa_raijo','費対果','来場単価（新規客']
+];
+function buildFromCSV(text){
+const R = parseCSV(text);
+const g = (r,c)=> (R[r] && R[r][c]!==undefined) ? R[r][c] : '';
+if(!CLEAN(g(0,2)).includes('広告予算')) throw new Error('シートの構成が想定と違います（広告予算の行が見つかりません）');
+const monthRows = [];
+for(let i=0;i<12;i++) monthRows.push(9+i*2);          // 予 の行。実 は +1
+const monthly = META.months.map((m,i)=>{
+const rb=monthRows[i], ra=rb+1;
+const cat={};
+for(const k in CATCOL) cat[k]={budget:numOf(g(rb,CATCOL[k]))||0, actual:numOf(g(ra,CATCOL[k]))||0};
+return {month:m, budget:numOf(g(rb,2))||0, actual:numOf(g(ra,2))||0, cat};
+});
+const labelByCol = META.labels;
+const items=[];
+GROUPS.forEach(([gname,a,b])=>{
+for(let c=a;c<b;c++){
+const mb = monthRows.map(r=>numOf(g(r,c))||0);
+const ma = monthRows.map(r=>numOf(g(r+1,c))||0);
+const sb = mb.reduce((s,v)=>s+v,0), sa = ma.reduce((s,v)=>s+v,0);
+if(!sb && !sa) continue;
+let name = labelByCol[c];
+if(!name){
+const parts=[];
+for(const r of [5,6,7,8]){ const v=CLEAN(g(r,c)); if(v && !parts.includes(v)) parts.push(v); }
+name = parts.length ? parts.join(' / ') : ('その他（列'+(c+1)+'）');
+}
+items.push({group:gname, name, col:c, budget:sb, actual:sa, mb, ma});
+}
+});
+const cat_total={};
+for(const k in CATCOL) cat_total[k]={
+budget: monthly.reduce((s,m)=>s+m.cat[k].budget,0),
+actual: monthly.reduce((s,m)=>s+m.cat[k].actual,0)};
+// 業績把握ブロック（A50 以降）
+let base=-1;
+for(let r=45;r<R.length-2;r++){ if(CLEAN(g(r,3))==='5月' && CLEAN(g(r,9))==='前期'){ base=r; break; } }
+const mcols=[3,4,5,6,7,8,10,11,12,13,14,15];
+const perf={};
+const bigLab=[]; let cur='';
+if(base>=0) for(let r=base;r<Math.min(base+32,R.length);r++){
+const v=CLEAN(g(r,1)).replace(/ /g,''); if(v) cur=v; bigLab[r]=cur; }
+const findRow=(big,small)=>{
+if(base<0) return -1;
+for(let r=base;r<Math.min(base+32,R.length);r++){
+if((bigLab[r]||'').startsWith(big) && CLEAN(g(r,2))===small) return r;
+}
+return -1;
+};
+PERF_KEYS.forEach(([key,big,small])=>{
+const r=findRow(big,small);
+perf[key]= r<0 ? new Array(12).fill(null) : mcols.map(c=>numOf(g(r,c)));
+});
+// 単価はシートの丸め値ではなく、金額÷件数で計算し直す
+for(let i=0;i<12;i++){
+const dir=perf.ad_direct[i], ind=perf.ad_indirect[i];
+const tot = (dir==null && ind==null) ? null : (dir||0)+(ind||0);
+perf.cpa_hankyo[i] = (tot && perf.hankyo_actual[i]) ? tot/perf.hankyo_actual[i] : null;
+perf.cpa_raijo[i]  = (tot && perf.raijo_actual[i])  ? tot/perf.raijo_actual[i]  : null;
+}
+const budget_total = numOf(g(0,3)) || monthly.reduce((s,m)=>s+m.budget,0);
+const actual_total = monthly.reduce((s,m)=>s+m.actual,0);
+return {months:META.months, monthly, items, cat_total, perf,
+head:{budget_total, actual_total,
+web_budget:cat_total['ホームページ流入'].budget, web_actual:cat_total['ホームページ流入'].actual}};
+}
+function countElapsed(d){
+let n=0;
+for(let i=0;i<12;i++){ if(d.perf.ad_direct[i]!=null && d.perf.ad_direct[i]>0) n++; else break; }
+return n||1;
+}
+const yen = n => (n<0?'−¥':'¥') + Math.abs(Math.round(n)).toLocaleString('ja-JP');
+function niceMax(v){ if(v<=0) return 1;
+const e=Math.pow(10,Math.floor(Math.log10(v))), f=v/e;
+const m=[1,1.25,1.5,2,2.5,3,4,5,6,8,10].find(x=>f<=x)||10; return m*e; }
+const yenK = n => n>=10000 ? (n/10000).toFixed(n>=1000000?0:1).replace(/\.0$/,'') + '万' : Math.round(n).toLocaleString('ja-JP');
+const pct = n => (n*100).toFixed(1) + '%';
+const NS='http://www.w3.org/2000/svg';
+function el(t,a={},p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function txt(p,x,y,s,o={}){const t=el('text',Object.assign({x,y,fill:'var(--muted)','font-size':11},o),p);t.textContent=s;return t;}
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let mode = 'year';
+const sum = (a,n)=>a.slice(0,n).reduce((s,v)=>s+(v||0),0);
+let annual = {budget:0, actual:0}, elapsedAgg = {budget:0, actual:0};
+function recalcAgg(){
+annual = {budget: DATA.head.budget_total, actual: DATA.head.actual_total};
+elapsedAgg = {
+budget: sum(DATA.monthly.map(m=>m.budget), ELAPSED),
+actual: sum(DATA.monthly.map(m=>m.actual), ELAPSED)
+};
+}
+const agg = () => mode==='year' ? annual : elapsedAgg;
+function rateClass(r){ return r>1 ? 'crit' : (r>=0.85 ? 'warn' : 'good'); }
+function renderCards(){
+const a = agg();
+const rate = a.actual/a.budget;
+const rest = a.budget - a.actual;
+const timeRate = mode==='year' ? ELAPSED/12 : 1;
+const web = DATA.cat_total['ホームページ流入'];
+const webA = mode==='year' ? web.actual : sum(DATA.monthly.map(m=>m.cat['ホームページ流入'].actual), ELAPSED);
+const webB = mode==='year' ? web.budget : sum(DATA.monthly.map(m=>m.cat['ホームページ流入'].budget), ELAPSED);
+const label = mode==='year' ? '年間' : `確定${ELAPSED}ヶ月`;
+const paceTxt = mode==='year'
+? `時間の経過率 ${pct(timeRate)} に対し ${rate>timeRate?'先行':'遅れ'}`
+: (rest>0 ? `${yen(rest)} 使い残し` : `${yen(-rest)} 超過`);
+const cards = [
+{lab:`${label}予算`, val:yen(a.budget), note:'広告宣伝費 合計'},
+{lab:`${label}実績`, val:yen(a.actual), note: mode==='year' ? '確定＋計上予定' : `確定実績（${ELAPSED}ヶ月）`},
+{lab:'予算消化率', val:pct(rate), pill:[rateClass(rate), paceTxt]},
+{lab:'予算残', val:yen(rest), note: mode==='year' ? '年間予算 − 計上済み' : '同期間の予算との差'},
+{lab:'WEB広告（直接）消化率', val:pct(webA/webB), note:`${yen(webA)} / ${yen(webB)}`},
+];
+document.getElementById('cards').innerHTML = cards.map(c=>`
+<div class="card"><div class="lab">${c.lab}</div><div class="val">${c.val}</div>
+${c.pill?`<div class="pill ${c.pill[0]}">${c.pill[1]}</div>`:''}
+${c.note?`<div class="note">${c.note}</div>`:''}</div>`).join('');
+const per = `${M[0]}〜${M[ELAPSED-1]}`;
+document.getElementById('segnote').textContent = mode==='year'
+? '年間予算に対する、現時点でシートに計上されている金額すべて（先々の固定費・発注済み分を含む）。'
+: `実績が確定している${per}の${ELAPSED}ヶ月だけを、同じ期間の予算と比べています。`;
+document.getElementById('catdesc').textContent = mode==='year'
+? '年間予算に対する、計上済み金額の内訳。' : `${per}の予算に対する、同期間の実績の内訳。`;
+document.getElementById('itemdesc').textContent = mode==='year'
+? '年間予算の大きい順。消化率100%超は赤。' : `${per}の予算の大きい順。消化率100%超は赤。`;
+document.getElementById('lgConfirm').textContent = `実績（確定：${per}）`;
+document.getElementById('lgPlan').textContent = `実績（予定計上：${M[ELAPSED]||''}〜）`;
+document.getElementById('monthlydesc').textContent = `${M[ELAPSED]||''}月以降は現時点でシートに入っている計上予定額です（確定実績ではありません）。`;
+}
+function mkTip(host){
+const d=document.createElement('div'); d.className='tt'; host.appendChild(d);
+return {
+show(html,x,y){ d.innerHTML=html; d.style.opacity=1;
+const w=d.offsetWidth, W=host.clientWidth;
+d.style.left=Math.max(4,Math.min(W-w-4,x-w/2))+'px'; d.style.top=(y-d.offsetHeight-12)+'px'; },
+hide(){ d.style.opacity=0; }
+};
+}
+function renderGauge(){
+const host=document.getElementById('gauge'); host.innerHTML='';
+const W=host.clientWidth||800, narrow=W<560, H=narrow?122:104;
+const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,height:H},host);
+const L=8, R=W-8, bw=R-L, y=30, h=34;
+const rate=annual.actual/annual.budget;
+el('rect',{x:L,y,width:bw,height:h,rx:8,fill:'var(--budget)'},svg);
+el('rect',{x:L,y,width:Math.max(4,bw*Math.min(rate,1)),height:h,rx:8,fill:'var(--s1)'},svg);
+// elapsed-confirmed portion
+el('rect',{x:L,y,width:Math.max(2,bw*(elapsedAgg.actual/annual.budget)),height:h,rx:8,fill:'var(--s1)'},svg);
+const tx=L+bw*(ELAPSED/12);
+el('line',{x1:tx,y1:y-10,x2:tx,y2:y+h+10,stroke:'var(--ink-2)','stroke-width':2,'stroke-dasharray':'4 3'},svg);
+txt(svg,tx,y-16,`時間の経過 ${ELAPSED}/12ヶ月 (${pct(ELAPSED/12)})`,{'text-anchor':'middle',fill:'var(--ink-2)','font-size':11.5});
+txt(svg,L+10,y+h/2+5,`消化 ${pct(rate)}`,{fill:'#fff','font-size':14,'font-weight':650});
+txt(svg,L,y+h+22,`実績 ${yen(annual.actual)}（うち確定 ${yen(elapsedAgg.actual)}）`,{'font-size':11.5});
+if(narrow) txt(svg,L,y+h+40,`予算 ${yen(annual.budget)}／残 ${yen(annual.budget-annual.actual)}`,{'font-size':11.5});
+else txt(svg,R,y+h+22,`予算 ${yen(annual.budget)}／残 ${yen(annual.budget-annual.actual)}`,{'text-anchor':'end','font-size':11.5});
+}
+function renderMonthly(){
+const host=document.getElementById('monthly'); host.innerHTML='';
+const W=host.clientWidth||800, H=300, P={t:16,r:10,b:34,l:58};
+const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,height:H},host);
+const tip=mkTip(host);
+const bs=DATA.monthly.map(m=>m.budget), as=DATA.monthly.map(m=>m.actual);
+const max=niceMax(Math.max(...bs,...as));
+const iw=W-P.l-P.r, ih=H-P.t-P.b;
+const step=iw/12, bw=Math.min(16,(step-10)/2);
+const yS=v=>P.t+ih-(v/max)*ih;
+for(let i=0;i<=4;i++){const v=max*i/4, y=yS(v);
+el('line',{x1:P.l,y1:y,x2:W-P.r,y2:y,stroke:i?'var(--grid)':'var(--axis)','stroke-width':1},svg);
+txt(svg,P.l-8,y+4,yenK(v),{'text-anchor':'end'});}
+DATA.monthly.forEach((m,i)=>{
+const cx=P.l+step*i+step/2;
+if(W>=560 || i%2===0) txt(svg,cx,H-14,m.month,{'text-anchor':'middle','font-size':11.5});
+const mk=(v,x,fill,op)=>{ if(!v) return;
+const h=Math.max(2,(v/max)*ih);
+el('rect',{x,y:P.t+ih-h,width:bw,height:h,rx:4,fill,opacity:op||1},svg); };
+mk(m.budget, cx-bw-1, 'var(--budget)');
+mk(m.actual, cx+1, 'var(--s1)', i<ELAPSED?1:.4);
+const hit=el('rect',{x:cx-step/2,y:P.t,width:step,height:ih,fill:'transparent'},svg);
+const r=m.budget?m.actual/m.budget:0;
+hit.addEventListener('mousemove',e=>{const b=host.getBoundingClientRect();
+tip.show(`<b>${m.month}</b>${i>=ELAPSED?' <span style="color:var(--muted)">計上予定</span>':''}
+<div class="row"><span>予算</span><span>${yen(m.budget)}</span></div>
+<div class="row"><span>実績</span><span>${yen(m.actual)}</span></div>
+<div class="row"><span>消化率</span><span>${m.budget?pct(r):'—'}</span></div>`,
+e.clientX-b.left, e.clientY-b.top);});
+hit.addEventListener('mouseleave',()=>tip.hide());
+});
+}
+function renderCum(){
+const host=document.getElementById('cum'); host.innerHTML='';
+const W=host.clientWidth||800, H=280, P={t:16,r:14,b:34,l:58};
+const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,height:H},host);
+const tip=mkTip(host);
+let cb=0, ca=0; const B=[], A=[];
+DATA.monthly.forEach(m=>{cb+=m.budget; ca+=m.actual; B.push(cb); A.push(ca);});
+const max=niceMax(Math.max(cb,ca));
+const iw=W-P.l-P.r, ih=H-P.t-P.b;
+const xS=i=>P.l+iw*i/11, yS=v=>P.t+ih-(v/max)*ih;
+for(let i=0;i<=4;i++){const v=max*i/4,y=yS(v);
+el('line',{x1:P.l,y1:y,x2:W-P.r,y2:y,stroke:i?'var(--grid)':'var(--axis)'},svg);
+txt(svg,P.l-8,y+4,yenK(v),{'text-anchor':'end'});}
+M.forEach((m,i)=>{ if(W>=560 || i%2===0) txt(svg,xS(i),H-14,m,{'text-anchor':'middle','font-size':11.5}); });
+const path=(arr,color,dash)=>{
+const d=arr.map((v,i)=>`${i?'L':'M'}${xS(i)},${yS(v)}`).join(' ');
+el('path',{d,fill:'none',stroke:color,'stroke-width':2,'stroke-linejoin':'round',
+'stroke-dasharray':dash||'none'},svg);};
+// area between
+const areaD = B.map((v,i)=>`${i?'L':'M'}${xS(i)},${yS(v)}`).join(' ')
++ ' ' + A.map((v,i)=>`L${xS(11-i)},${yS(A[11-i])}`).join(' ') + ' Z';
+el('path',{d:areaD,fill:'var(--s1)',opacity:.07},svg);
+path(B,'var(--muted)','5 4'); path(A,'var(--s1)');
+A.forEach((v,i)=>{ el('circle',{cx:xS(i),cy:yS(v),r:i<ELAPSED?4:3,fill:'var(--s1)',
+stroke:'var(--surface)','stroke-width':2,opacity:i<ELAPSED?1:.5},svg); });
+txt(svg,xS(ELAPSED-1),yS(A[ELAPSED-1])-12,yenK(A[ELAPSED-1]),{fill:'var(--s1)','font-size':11.5,'font-weight':650,'text-anchor':'middle'});
+const hit=el('rect',{x:P.l,y:P.t,width:iw,height:ih,fill:'transparent'},svg);
+const cross=el('line',{y1:P.t,y2:P.t+ih,stroke:'var(--axis)','stroke-width':1,opacity:0},svg);
+hit.addEventListener('mousemove',e=>{const b=host.getBoundingClientRect();
+const rel=(e.clientX-b.left)/host.clientWidth*W;
+const i=Math.max(0,Math.min(11,Math.round((rel-P.l)/(iw/11))));
+cross.setAttribute('x1',xS(i)); cross.setAttribute('x2',xS(i)); cross.setAttribute('opacity',1);
+tip.show(`<b>${M[i]}まで</b>
+<div class="row"><span>累計予算</span><span>${yen(B[i])}</span></div>
+<div class="row"><span>累計実績</span><span>${yen(A[i])}</span></div>
+<div class="row"><span>差</span><span>${yen(B[i]-A[i])}</span></div>`, xS(i)/W*host.clientWidth, e.clientY-b.top);});
+hit.addEventListener('mouseleave',()=>{tip.hide(); cross.setAttribute('opacity',0);});
+}
+function catData(){
+return Object.keys(DATA.cat_total).map(k=>{
+const b = mode==='year' ? DATA.cat_total[k].budget : sum(DATA.monthly.map(m=>m.cat[k].budget),ELAPSED);
+const a = mode==='year' ? DATA.cat_total[k].actual : sum(DATA.monthly.map(m=>m.cat[k].actual),ELAPSED);
+return {name:k, b, a};
+}).filter(d=>d.b||d.a).sort((x,y)=>y.b-x.b);
+}
+function renderCat(){
+const host=document.getElementById('cat'); host.innerHTML='';
+const rows=catData();
+const W=host.clientWidth||800, narrow=W<560;
+const rowH=narrow?72:52, H=rows.length*rowH+18;
+const P={l:narrow?0:Math.min(150,W*0.3), r:narrow?70:96};
+const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,height:H},host);
+const tip=mkTip(host);
+const max=Math.max(...rows.map(d=>Math.max(d.b,d.a)));
+const iw=W-P.l-P.r;
+rows.forEach((d,i)=>{
+const y=10+i*rowH;
+const r=d.b?d.a/d.b:0;
+const top=narrow?y+16:y;
+if(narrow) txt(svg,0,y+8,d.name,{'text-anchor':'start',fill:'var(--ink)','font-size':12.5});
+else txt(svg,P.l-10,y+20,d.name,{'text-anchor':'end',fill:'var(--ink)','font-size':12.5});
+el('rect',{x:P.l,y:top+6,width:Math.max(2,iw*d.b/max),height:12,rx:4,fill:'var(--budget)'},svg);
+el('rect',{x:P.l,y:top+22,width:Math.max(2,iw*d.a/max),height:12,rx:4,
+fill:r>1?'var(--crit)':'var(--s1)'},svg);
+txt(svg,W,top+22,d.b?pct(r):'—',{'text-anchor':'end',fill:r>1?'var(--crit)':'var(--ink)','font-size':13,'font-weight':650});
+txt(svg,W,top+37,`${yenK(d.a)} / ${yenK(d.b)}`,{'text-anchor':'end','font-size':11});
+const hit=el('rect',{x:0,y,width:W,height:rowH,fill:'transparent'},svg);
+hit.addEventListener('mousemove',e=>{const bb=host.getBoundingClientRect();
+tip.show(`<b>${d.name}</b>
+<div class="row"><span>予算</span><span>${yen(d.b)}</span></div>
+<div class="row"><span>実績</span><span>${yen(d.a)}</span></div>
+<div class="row"><span>消化率</span><span>${d.b?pct(r):'—'}</span></div>`,
+e.clientX-bb.left,e.clientY-bb.top);});
+hit.addEventListener('mouseleave',()=>tip.hide());
+});
+}
+function renderMRate(){
+const host=document.getElementById('mrate'); host.innerHTML='';
+const W=host.clientWidth||800, H=250, P={t:18,r:10,b:34,l:46};
+const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,height:H},host);
+const tip=mkTip(host);
+const rates=DATA.monthly.map(m=>m.budget?m.actual/m.budget:null);
+const max=Math.max(1.2,niceMax(Math.max(...rates.map(r=>r||0))));
+const iw=W-P.l-P.r, ih=H-P.t-P.b, step=iw/12, bw=Math.min(26,step-14);
+const yS=v=>P.t+ih-(v/max)*ih;
+for(let i=0;i<=4;i++){const v=max*i/4,y=yS(v);
+el('line',{x1:P.l,y1:y,x2:W-P.r,y2:y,stroke:i?'var(--grid)':'var(--axis)'},svg);
+txt(svg,P.l-8,y+4,Math.round(v*100)+'%',{'text-anchor':'end'});}
+const y100=yS(1);
+el('line',{x1:P.l,y1:y100,x2:W-P.r,y2:y100,stroke:'var(--ink-2)','stroke-width':1.5,'stroke-dasharray':'3 4',opacity:.7},svg);
+txt(svg,P.l+4,y100-6,'予算100%',{fill:'var(--ink-2)','font-size':11});
+DATA.monthly.forEach((m,i)=>{
+const cx=P.l+step*i+step/2, r=rates[i];
+if(W>=560 || i%2===0) txt(svg,cx,H-14,m.month,{'text-anchor':'middle','font-size':11.5});
+if(r==null) return;
+const h=Math.max(2,(Math.min(r,max)/max)*ih);
+el('rect',{x:cx-bw/2,y:P.t+ih-h,width:bw,height:h,rx:4,
+fill:r>1?'var(--crit)':'var(--s1)',opacity:i<ELAPSED?1:.4},svg);
+txt(svg,cx,P.t+ih-h-7,pct(r),{'text-anchor':'middle','font-size':11,
+fill:r>1?'var(--crit)':'var(--ink)','font-weight':i<ELAPSED?650:400,opacity:i<ELAPSED?1:.6});
+const hit=el('rect',{x:cx-step/2,y:P.t,width:step,height:ih,fill:'transparent'},svg);
+hit.addEventListener('mousemove',e=>{const b=host.getBoundingClientRect();
+tip.show(`<b>${m.month}</b>${i>=ELAPSED?' <span style="color:var(--muted)">計上予定</span>':''}
+<div class="row"><span>予算</span><span>${yen(m.budget)}</span></div>
+<div class="row"><span>実績</span><span>${yen(m.actual)}</span></div>
+<div class="row"><span>消化率</span><span>${pct(r)}</span></div>
+<div class="row"><span>差</span><span>${yen(m.budget-m.actual)}</span></div>`,
+e.clientX-b.left,e.clientY-b.top);});
+hit.addEventListener('mouseleave',()=>tip.hide());
+});
+}
+function renderMatrix(){
+const t=document.getElementById('matrix');
+const cats=Object.keys(DATA.cat_total).filter(k=>DATA.cat_total[k].budget||DATA.cat_total[k].actual);
+const cell=(b,a)=>{
+if(!b && !a) return '<td class="mx"><span class="mxv" style="color:var(--muted)">—</span></td>';
+if(!b) return `<td class="mx" data-b="${b}" data-a="${a}"><span class="mxv" style="color:var(--crit)">予算なし</span></td>`;
+const r=a/b, over=r>1;
+const al=Math.min(.45, Math.max(.05, r*0.42));
+const bg = over ? 'rgba(208,59,59,.22)' : `color-mix(in srgb, var(--s1) ${Math.round(al*100)}%, transparent)`;
+return `<td class="mx" style="background:${bg}" data-b="${b}" data-a="${a}">
+<span class="mxv" style="${over?'color:var(--crit);font-weight:700':''}">${pct(r)}</span></td>`;
+};
+let h='<thead><tr><th>カテゴリ</th>'+M.map((m,i)=>`<th${i>=ELAPSED?' style="opacity:.55"':''}>${m}</th>`).join('')+'<th>通期</th></tr></thead><tbody>';
+cats.forEach(k=>{
+h+=`<tr><td>${k}</td>`;
+DATA.monthly.forEach(m=>{ h+=cell(m.cat[k].budget,m.cat[k].actual); });
+const tb=DATA.monthly.reduce((s,m)=>s+m.cat[k].budget,0), ta=DATA.monthly.reduce((s,m)=>s+m.cat[k].actual,0);
+h+=cell(tb,ta)+'</tr>';
+});
+h+='<tr class="total"><td>全体</td>';
+DATA.monthly.forEach(m=>{ h+=cell(m.budget,m.actual); });
+h+=cell(DATA.monthly.reduce((s,m)=>s+m.budget,0),DATA.monthly.reduce((s,m)=>s+m.actual,0))+'</tr>';
+t.innerHTML=h+'</tbody>';
+t.querySelectorAll('td.mx[data-b]').forEach(td=>{
+td.title=`予算 ${yen(+td.dataset.b)} ／ 実績 ${yen(+td.dataset.a)} ／ 差 ${yen(td.dataset.b-td.dataset.a)}`;
+});
+}
+function renderCPA(){
+const host=document.getElementById('cpa'); host.innerHTML='';
+const p=DATA.perf;
+const direct = p.ad_direct, indirect = p.ad_indirect;
+const total = direct.map((v,i)=> v==null?null:(v+(indirect[i]||0)));
+const cpaH = p.cpa_hankyo, cpaR = p.cpa_raijo;
+const cpaRD = direct.map((v,i)=> (v==null||!p.raijo_actual[i])?null : v/p.raijo_actual[i]);
+const series=[{n:'反響単価',c:'var(--s1)',v:cpaH},{n:'来場単価(全体)',c:'var(--s2)',v:cpaR},
+{n:'来場単価(直接)',c:'var(--s3)',v:cpaRD}];
+const W=host.clientWidth||800, H=290, P={t:26,r:W<560?12:130,b:34,l:62};
+const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,height:H},host);
+const tip=mkTip(host);
+const vals=series.flatMap(s=>s.v.filter(v=>v!=null));
+const max=niceMax(Math.max(...vals,110000));
+const iw=W-P.l-P.r, ih=H-P.t-P.b;
+const n=ELAPSED; // only months with data
+const lastIdx=n-1, den=Math.max(1,lastIdx);
+const xS=i=>P.l+iw*i/den, yS=v=>P.t+ih-(v/max)*ih;
+for(let i=0;i<=4;i++){const v=max*i/4,y=yS(v);
+el('line',{x1:P.l,y1:y,x2:W-P.r,y2:y,stroke:i?'var(--grid)':'var(--axis)'},svg);
+txt(svg,P.l-8,y+4,yenK(v),{'text-anchor':'end'});}
+[[60000,'目標 6万（直接）'],[100000,'目標 10万（全体）']].forEach(([v,l])=>{
+const y=yS(v);
+el('line',{x1:P.l,y1:y,x2:W-P.r,y2:y,stroke:'var(--ink-2)','stroke-width':1.5,'stroke-dasharray':'3 4',opacity:.6},svg);
+txt(svg,P.l+6,y-6,l,{'text-anchor':'start',fill:'var(--ink-2)','font-size':11});
+});
+M.slice(0,n).forEach((m,i)=>txt(svg,xS(i),H-14,m,{'text-anchor':'middle','font-size':11.5}));
+const endLabels=[];
+series.forEach(s=>{
+const pts=[]; s.v.forEach((v,i)=>{ if(v!=null) pts.push([i,v]); });
+if(!pts.length) return;
+el('path',{d:pts.map((q,k)=>`${k?'L':'M'}${xS(q[0])},${yS(q[1])}`).join(' '),
+fill:'none',stroke:s.c,'stroke-width':2,'stroke-linejoin':'round'},svg);
+pts.forEach(q=>el('circle',{cx:xS(q[0]),cy:yS(q[1]),r:4.5,fill:s.c,stroke:'var(--surface)','stroke-width':2},svg));
+const last=pts[pts.length-1];
+endLabels.push({y:yS(last[1]), c:s.c, t:`${s.n} ${yenK(last[1])}`});
+});
+endLabels.sort((a,b)=>a.y-b.y);
+for(let k=1;k<endLabels.length;k++){
+if(endLabels[k].y-endLabels[k-1].y<15) endLabels[k].y=endLabels[k-1].y+15; }
+if(W>=560) endLabels.forEach(L=>txt(svg,W-P.r+10,L.y+4,L.t,{fill:L.c,'font-size':11.5,'font-weight':650,'text-anchor':'start'}));
+for(let i=0;i<n;i++){
+const hit=el('rect',{x:xS(i)-iw/den/2,y:P.t,width:iw/den,height:ih,fill:'transparent'},svg);
+hit.addEventListener('mousemove',e=>{const b=host.getBoundingClientRect();
+tip.show(`<b>${M[i]}</b>`+series.map(s=>`<div class="row"><span style="color:${s.c}">■</span><span>${s.n}</span><span>${s.v[i]!=null?yen(s.v[i]):'—'}</span></div>`).join(''),
+xS(i)/W*host.clientWidth, e.clientY-b.top);});
+hit.addEventListener('mouseleave',()=>tip.hide());
+}
+// table view (relief for low-contrast series + accessibility)
+const t=document.getElementById('cpatable');
+let html='<thead><tr><th>月</th><th>広告費 合計</th><th>うち直接</th><th>反響数</th><th>来場数</th><th>反響単価</th><th>来場単価(全体)</th><th>来場単価(直接)</th></tr></thead><tbody>';
+for(let i=0;i<n;i++){
+html+=`<tr><td>${M[i]}</td><td>${yen(total[i])}</td><td>${yen(direct[i])}</td>
+<td>${p.hankyo_actual[i]}</td><td>${p.raijo_actual[i]}</td>
+<td>${yen(cpaH[i])}</td><td>${yen(cpaR[i])}</td>
+<td style="color:${cpaRD[i]>60000?'var(--crit)':'var(--good)'};font-weight:650">${yen(cpaRD[i])}</td></tr>`;
+}
+const tt=sum(total,n), td=sum(direct,n), th=sum(p.hankyo_actual,n), tr=sum(p.raijo_actual,n);
+html+=`<tr class="total"><td>${M[0]}〜${M[n-1]} 計</td><td>${yen(tt)}</td><td>${yen(td)}</td><td>${th}</td><td>${tr}</td>
+<td>${yen(tt/th)}</td><td>${yen(tt/tr)}</td>
+<td style="color:${td/tr>60000?'var(--crit)':'var(--good)'};font-weight:650">${yen(td/tr)}</td></tr>`;
+t.innerHTML=html+'</tbody>';
+}
+function renderBars(hostId, title, target, actual, color){
+const host=document.getElementById(hostId); host.innerHTML='';
+const W=host.clientWidth||800, H=200, P={t:26,r:10,b:30,l:40};
+const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,height:H},host);
+const tip=mkTip(host);
+const max=niceMax(Math.max(...target.map(v=>v||0),...actual.map(v=>v||0)));
+const iw=W-P.l-P.r, ih=H-P.t-P.b, step=iw/12, bw=Math.min(14,(step-8)/2);
+const yS=v=>P.t+ih-(v/max)*ih;
+txt(svg,P.l-30,14,title,{fill:'var(--ink)','font-size':12.5,'font-weight':650,'text-anchor':'start'});
+for(let i=0;i<=2;i++){const v=max*i/2,y=yS(v);
+el('line',{x1:P.l,y1:y,x2:W-P.r,y2:y,stroke:i?'var(--grid)':'var(--axis)'},svg);
+txt(svg,P.l-8,y+4,Math.round(v),{'text-anchor':'end'});}
+M.forEach((m,i)=>{
+const cx=P.l+step*i+step/2;
+if(W>=560 || i%2===0) txt(svg,cx,H-12,m,{'text-anchor':'middle','font-size':11});
+const put=(v,x,fill,op)=>{ if(!v) return; const h=Math.max(2,(v/max)*ih);
+el('rect',{x,y:P.t+ih-h,width:bw,height:h,rx:4,fill,opacity:op||1},svg); };
+put(target[i], cx-bw-1, 'var(--budget)');
+put(actual[i], cx+1, color);
+const r=target[i]?actual[i]/target[i]:null;
+const hit=el('rect',{x:cx-step/2,y:P.t,width:step,height:ih,fill:'transparent'},svg);
+hit.addEventListener('mousemove',e=>{const b=host.getBoundingClientRect();
+tip.show(`<b>${m}</b>
+<div class="row"><span>目標</span><span>${target[i]??'—'}</span></div>
+<div class="row"><span>実績</span><span>${actual[i]??'—'}</span></div>
+<div class="row"><span>達成率</span><span>${(r!=null&&i<ELAPSED)?pct(r):'—'}</span></div>`,
+e.clientX-b.left,e.clientY-b.top);});
+hit.addEventListener('mouseleave',()=>tip.hide());
+});
+}
+function renderPerf(){
+const p=DATA.perf;
+renderBars('perf1','反響数（資料請求＋来場予約）', p.hankyo_target, p.hankyo_actual, 'var(--s1)');
+renderBars('perf2','来場数（初回接客数）', p.raijo_target, p.raijo_actual, 'var(--s2)');
+}
+function renderItems(){
+const groups={};
+DATA.items.forEach(it=>{
+const nm = mode==='year' ? 12 : ELAPSED;
+const b = sum(it.mb,nm), a = sum(it.ma,nm);
+if(!b && !a) return;
+(groups[it.group] ||= []).push({name:it.name,b,a});
+});
+let html='<thead><tr><th>項目</th><th>予算</th><th>実績</th><th>残</th><th style="text-align:right">消化率</th></tr></thead><tbody>';
+let TB=0,TA=0;
+Object.keys(groups).forEach(g=>{
+const rows=groups[g].sort((x,y)=>y.b-x.b);
+const gb=rows.reduce((s,r)=>s+r.b,0), ga=rows.reduce((s,r)=>s+r.a,0);
+TB+=gb; TA+=ga;
+html+=`<tr class="grp"><td>${g}</td><td>${yen(gb)}</td><td>${yen(ga)}</td><td>${yen(gb-ga)}</td><td style="text-align:right">${gb?pct(ga/gb):'—'}</td></tr>`;
+rows.forEach(r=>{
+const rate=r.b?r.a/r.b:null;
+const w=rate==null?0:Math.min(100,rate*100);
+html+=`<tr><td style="padding-left:22px;color:var(--ink-2)">${r.name}</td>
+<td>${yen(r.b)}</td><td>${yen(r.a)}</td><td>${yen(r.b-r.a)}</td>
+<td><div class="cell-rate"><span class="bar"><i class="${rate>1?'over':''}" style="width:${w}%"></i></span>
+<span style="min-width:52px;text-align:right;color:${rate>1?'var(--crit)':'var(--ink)'}">${rate==null?'—':pct(rate)}</span></div></td></tr>`;
+});
+});
+html+=`<tr class="total"><td>合計（明細計上分）</td><td>${yen(TB)}</td><td>${yen(TA)}</td><td>${yen(TB-TA)}</td><td style="text-align:right">${pct(TA/TB)}</td></tr>`;
+document.getElementById('items').innerHTML=html+'</tbody>';
+}
+function renderAll(){ recalcAgg(); renderCards(); renderGauge(); renderMonthly(); renderCum();
+renderCat(); renderMRate(); renderMatrix(); renderCPA(); renderPerf(); renderItems(); }
+function setStatus(kind, msg){
+const el=document.getElementById('status');
+el.className='status '+kind; el.textContent=msg;
+}
+async function load(){
+setStatus('loading','スプレッドシートから読み込み中…');
+try{
+const res = await fetch(CSV_URL + '&_=' + Date.now(), {cache:'no-store'});
+if(!res.ok) throw new Error('HTTP '+res.status);
+const d = buildFromCSV(await res.text());
+DATA = d; ELAPSED = countElapsed(d);
+renderAll();
+const t = new Date();
+setStatus('ok','最新データ ／ 取得 ' + t.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) + '　（確定実績 ' + ELAPSED + 'ヶ月分）');
+}catch(e){
+setStatus('warn','スプレッドシートを読み込めませんでした（' + e.message + '）。「最新に更新」を押すか、しばらくしてから再読み込みしてください。');
+if(!DATA) document.getElementById('body').style.display='none';
+}
+}
+document.getElementById('reload').onclick = load;
+document.getElementById('btnY').onclick=()=>{mode='year';setSeg();renderAll();};
+document.getElementById('btnE').onclick=()=>{mode='elapsed';setSeg();renderAll();};
+function setSeg(){ document.getElementById('btnY').setAttribute('aria-pressed',mode==='year');
+document.getElementById('btnE').setAttribute('aria-pressed',mode==='elapsed'); }
+load();
+let rt; addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(renderAll,180);});
+</script>

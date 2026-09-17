@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>制震DBダッシュボード</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root{
+color-scheme: light;
+--plane:#f9f9f7; --surface:#fcfcfb; --surface-2:#f2f1ed;
+--ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+--grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+--s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300;
+--r1:#86b6ef; --r2:#5598e7; --r3:#2a78d6; --r4:#1c5cab;
+--good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+--track:#e6e5df;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+color-scheme: dark;
+--plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
+--ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+--grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+--s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300;
+--r1:#1c5cab; --r2:#256abf; --r3:#3987e5; --r4:#6da7ec;
+--track:#2f2f2c;
+}}
+:root[data-theme="dark"]{
+color-scheme: dark;
+--plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
+--ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+--grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+--s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300;
+--r1:#1c5cab; --r2:#256abf; --r3:#3987e5; --r4:#6da7ec;
+--track:#2f2f2c;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--plane); color:var(--ink);
+font-family:"Noto Sans JP",system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif;
+font-size:14px; line-height:1.65;}
+h1,h2,.card .val,.tabs button{font-family:"Zen Kaku Gothic New","Noto Sans JP",system-ui,sans-serif;}
+.wrap{max-width:1160px; margin:0 auto; padding:28px 16px 64px;}
+header h1{font-size:25px; font-weight:700; margin:0 0 4px}
+.sub{color:var(--ink-2); font-size:13px; margin:0}
+.statusrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px}
+.status{font-size:12px; padding:3px 10px; border-radius:999px; font-weight:500}
+.status.loading{background:var(--surface-2); color:var(--ink-2)}
+.status.ok{background:rgba(12,163,12,.13); color:var(--good)}
+.status.warn{background:rgba(250,178,25,.18); color:#8a6000}
+.reload{appearance:none; border:1px solid var(--ring); background:var(--surface); color:var(--ink-2);
+font:inherit; font-size:12px; padding:4px 12px; border-radius:999px; cursor:pointer}
+.reload:hover{background:var(--surface-2); color:var(--ink)}
+/* gate */
+#gate{margin:26px 0 0}
+.gatebox{background:var(--surface); border:1px solid var(--ring); border-radius:12px; padding:22px 20px; max-width:420px}
+.gatelab{margin:0 0 12px; font-size:13px; color:var(--ink-2)}
+#gateform{display:flex; gap:8px; flex-wrap:wrap}
+#pass{flex:1 1 180px; min-width:0; font:inherit; font-size:14px; padding:9px 12px;
+border:1px solid var(--axis); border-radius:9px; background:var(--plane); color:var(--ink)}
+#pass:focus{outline:2px solid var(--s1); outline-offset:1px}
+#gateform button{appearance:none; border:0; background:var(--s1); color:#fff; font:inherit;
+font-weight:600; padding:9px 20px; border-radius:9px; cursor:pointer}
+.gateerr{margin:10px 0 0; font-size:12.5px; color:var(--crit)}
+/* controls */
+.controls{position:sticky; top:0; z-index:10; background:var(--plane); padding:14px 0 10px; margin-top:12px;
+border-bottom:1px solid var(--grid)}
+.tabs{display:flex; gap:2px; background:var(--surface-2); border-radius:10px; padding:3px; overflow-x:auto; width:max-content; max-width:100%}
+.tabs button{appearance:none; border:0; background:transparent; color:var(--ink-2); white-space:nowrap;
+font:inherit; font-size:13.5px; padding:6px 14px; border-radius:8px; cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--surface); color:var(--ink); font-weight:700;
+box-shadow:0 1px 2px rgba(0,0,0,.08), 0 0 0 1px var(--ring)}
+.period{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:10px; font-size:12.5px; color:var(--ink-2)}
+.period input[type=date]{font:inherit; font-size:12.5px; padding:4px 8px; border:1px solid var(--axis);
+border-radius:8px; background:var(--surface); color:var(--ink)}
+.chip{appearance:none; border:1px solid var(--ring); background:var(--surface); color:var(--ink-2);
+font:inherit; font-size:12px; padding:3px 11px; border-radius:999px; cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink); color:var(--plane); border-color:var(--ink)}
+.periodnote{color:var(--muted); font-size:12px; margin:6px 0 0}
+.panel{margin-top:18px}
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:18px}
+.card{background:var(--surface); border:1px solid var(--ring); border-radius:12px; padding:13px 15px}
+.card .lab{font-size:12px; color:var(--ink-2); margin-bottom:4px}
+.card .val{font-size:26px; font-weight:700; letter-spacing:-.015em; line-height:1.15; font-variant-numeric:tabular-nums}
+.card .val small{font-size:13px; font-weight:500; color:var(--ink-2); margin-left:3px}
+.card .note{font-size:11.5px; color:var(--muted); margin-top:4px}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+.grid2>section{margin-bottom:0}
+.grid2{margin-bottom:18px}
+@media (max-width:860px){ .grid2{grid-template-columns:1fr} }
+section{background:var(--surface); border:1px solid var(--ring); border-radius:12px; padding:18px 18px 14px; margin-bottom:18px; min-width:0}
+section h2{font-size:15.5px; margin:0 0 3px; font-weight:700}
+section .desc{font-size:12.5px; color:var(--ink-2); margin:0 0 12px}
+.legend{display:flex; flex-wrap:wrap; gap:6px 14px; margin:0 0 10px; font-size:12px; color:var(--ink-2)}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+.sw{width:12px; height:12px; border-radius:3px; display:inline-block}
+.chart{position:relative; width:100%}
+.chart svg{display:block; width:100%; height:auto; overflow:visible}
+.tt{position:absolute; pointer-events:none; z-index:5; background:var(--surface);
+border:1px solid var(--ring); border-radius:8px; padding:8px 10px; font-size:12px;
+box-shadow:0 4px 16px rgba(0,0,0,.14); white-space:nowrap; opacity:0; transition:opacity .08s}
+.tt b{font-weight:700}
+.tt .row{display:flex; justify-content:space-between; gap:14px; font-variant-numeric:tabular-nums}
+.tt .row i{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px}
+.tablewrap{overflow-x:auto}
+.tablewrap.tall{max-height:520px; overflow-y:auto}
+table{border-collapse:collapse; width:100%; font-size:13px}
+th,td{padding:7px 9px; text-align:right; border-bottom:1px solid var(--grid); font-variant-numeric:tabular-nums; vertical-align:top}
+th{font-size:11.5px; color:var(--muted); font-weight:600; white-space:nowrap; position:sticky; top:0; background:var(--surface); z-index:1}
+td.l,th.l{text-align:left}
+td.txt{white-space:normal; min-width:260px; width:40%; overflow-wrap:anywhere; color:var(--ink-2)}
+td.nw{white-space:nowrap}
+tbody tr:hover{background:var(--surface-2)}
+tr.total td{font-weight:700; border-top:2px solid var(--axis)}
+.rate{display:flex; align-items:center; gap:8px; justify-content:flex-end}
+.bar{position:relative; height:7px; width:70px; background:var(--track); border-radius:4px; display:inline-block; flex:none}
+.bar i{position:absolute; inset:0 auto 0 0; border-radius:4px; background:var(--s1); display:block}
+.tag{display:inline-block; font-size:11.5px; padding:1px 8px; border-radius:999px; white-space:nowrap; background:var(--surface-2); color:var(--ink-2)}
+.tag.done{background:rgba(12,163,12,.13); color:var(--good)}
+.tag.doing{background:rgba(42,120,214,.13); color:var(--s1)}
+.tag.todo{background:rgba(250,178,25,.18); color:#8a6000}
+.tag.none{background:transparent; color:var(--muted)}
+.tag.lost{background:rgba(208,59,59,.12); color:var(--crit)}
+.stale{color:var(--crit); font-weight:600}
+.warmish{color:#8a6000; font-weight:600}
+:root[data-theme="dark"] .tag.todo, :root[data-theme="dark"] .warmish, :root[data-theme="dark"] .status.warn{color:var(--warn)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .tag.todo,
+:root:not([data-theme="light"]) .warmish, :root:not([data-theme="light"]) .status.warn{color:var(--warn)} }
+.toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 10px; font-size:12.5px; color:var(--ink-2)}
+.toolbar input[type=search]{font:inherit; font-size:12.5px; padding:4px 10px; border:1px solid var(--axis); border-radius:8px; background:var(--plane); color:var(--ink); min-width:0; flex:0 1 220px}
+.hbar-row{display:grid; grid-template-columns:minmax(80px,120px) 1fr 44px; gap:10px; align-items:center; font-size:12.5px; padding:3px 0}
+.hbar-row .nm{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.hbar-row .n{text-align:right; font-variant-numeric:tabular-nums; color:var(--ink-2)}
+.hbar{display:flex; gap:2px; height:14px}
+.hbar i{display:block; height:100%; border-radius:0}
+.hbar i:first-child{border-radius:4px 0 0 4px}
+.hbar i:last-child{border-radius:0 4px 4px 0}
+.hbar i:only-child{border-radius:4px}
+.funnel .hbar-row{grid-template-columns:minmax(110px,150px) 1fr 110px}
+.empty{color:var(--muted); font-size:13px; padding:12px 0}
+footer{color:var(--muted); font-size:12px; margin-top:26px; line-height:1.8}
+@media (max-width:560px){ .card .val{font-size:22px} header h1{font-size:20px} .controls{position:static} }
+.grid2 .bar{width:44px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>制震DBダッシュボード</h1>
+<p class="sub">出典：Google ドライブ「制震DB」の 顧客管理・アクション管理・CS シート（連携シート経由で自動取得）</p>
+<div class="statusrow" id="statusrow" hidden>
+<span class="status loading" id="status">読み込み中…</span>
+<button class="reload" id="reload" type="button">最新に更新</button>
+</div>
+</header>
+
+<div id="gate">
+<div class="gatebox">
+<p class="gatelab">このページは合言葉で保護されています</p>
+<form id="gateform">
+<input id="pass" type="password" autocomplete="current-password" placeholder="合言葉" aria-label="合言葉">
+<button type="submit">開く</button>
+</form>
+<p class="gateerr" id="gateerr" hidden>合言葉が違います</p>
+</div>
+</div>
+
+<div id="body" hidden>
+<div class="controls">
+<div class="tabs" role="tablist">
+<button role="tab" data-tab="deal" aria-selected="true">商談の進み具合</button>
+<button role="tab" data-tab="act" aria-selected="false">活動量</button>
+<button role="tab" data-tab="area" aria-selected="false">商流・エリア</button>
+<button role="tab" data-tab="cs" aria-selected="false">導入後CS</button>
+</div>
+<div class="period" id="periodbar">
+<span>期間</span>
+<input type="date" id="dFrom" aria-label="開始日"> 〜 <input type="date" id="dTo" aria-label="終了日">
+<span id="presets"></span>
+</div>
+<p class="periodnote" id="periodnote"></p>
+</div>
+
+<!-- ===== 商談 ===== -->
+<div class="panel" data-panel="deal">
+<div class="cards" id="dealCards"></div>
+<section>
+<h2>月別 リード・商談・成約の件数</h2>
+<p class="desc">それぞれの日付（リード発生日・商談日・成約日）が入っている月で数えています。</p>
+<div class="legend" id="dealLegend"></div>
+<div class="chart" id="dealMonthly"></div>
+</section>
+<div class="grid2">
+<section>
+<h2>ステージの進み具合</h2>
+<p class="desc" id="funnelDesc"></p>
+<div class="funnel" id="funnel"></div>
+</section>
+<section>
+<h2>現在のステータス（全期間）</h2>
+<p class="desc">顧客管理の「商談フェーズ」の今の状態。期間の指定には連動しません。</p>
+<div id="phaseNow"></div>
+</section>
+</div>
+<section>
+<h2>流入経路別の成約状況</h2>
+<p class="desc">期間内に最初の動き（リード発生・商談・成約のいちばん早い日付）があった企業を、流入経路ごとに集計。成約率＝成約 ÷ 商談まで進んだ社数。</p>
+<div class="tablewrap"><table id="srcTable"></table></div>
+</section>
+<section>
+<h2>フォローが必要な商談</h2>
+<p class="desc">「商談中」「アポイント獲得済」の企業を、最後の接触（アクション管理の最新活動日 or 最終更新日）が古い順に表示。<span class="stale">60日以上</span>・<span class="warmish">30日以上</span>で色分け。</p>
+<div class="toolbar">
+<button class="chip" data-follow="all" aria-pressed="true">すべて</button>
+<button class="chip" data-follow="商談中" aria-pressed="false">商談中</button>
+<button class="chip" data-follow="アポイント獲得済" aria-pressed="false">アポイント獲得済</button>
+<span id="followCount"></span>
+</div>
+<div class="tablewrap tall"><table id="followTable"></table></div>
+</section>
+</div>
+
+<!-- ===== 活動量 ===== -->
+<div class="panel" data-panel="act" hidden>
+<div class="cards" id="actCards"></div>
+<section>
+<h2>月別の活動件数（フェーズ別）</h2>
+<p class="desc">アクション管理の「活動日」と「活動内容フェーズ」で集計。</p>
+<div class="legend" id="actLegend"></div>
+<div class="chart" id="actMonthly"></div>
+</section>
+<div class="grid2">
+<section>
+<h2>対応担当者別の活動件数</h2>
+<p class="desc">「対応担当者」が空欄の活動は「未記入」にまとめています。</p>
+<div class="tablewrap"><table id="actRep"></table></div>
+</section>
+<section>
+<h2>活動の多い企業</h2>
+<p class="desc">期間内の活動件数の上位15社。</p>
+<div class="tablewrap"><table id="actTop"></table></div>
+</section>
+</div>
+<section>
+<h2>直近の活動</h2>
+<p class="desc">期間内の活動を新しい順に表示（最大100件）。</p>
+<div class="toolbar"><input type="search" id="actSearch" placeholder="企業名・内容で絞り込み" aria-label="活動の絞り込み"></div>
+<div class="tablewrap tall"><table id="actList"></table></div>
+</section>
+</div>
+
+<!-- ===== 商流・エリア ===== -->
+<div class="panel" data-panel="area" hidden>
+<div class="cards" id="areaCards"></div>
+<section>
+<h2>1次商流別</h2>
+<p class="desc">期間内に最初の動きがあった企業（商談フェーズが入っている企業）を1次商流で集計。成約率＝成約 ÷ 商談まで進んだ社数。</p>
+<div class="tablewrap"><table id="routeTable"></table></div>
+</section>
+<section>
+<h2>都道府県別の社数</h2>
+<p class="desc">郵送先の都道府県。バーの色は今のステータス。上位20件。</p>
+<div class="legend" id="prefLegend"></div>
+<div id="prefBars"></div>
+</section>
+<div class="grid2">
+<section>
+<h2>企業種別</h2>
+<p class="desc">直取店／流通店、新築／リフォーム別。</p>
+<div class="tablewrap"><table id="typeTable"></table></div>
+</section>
+<section>
+<h2>採用状況と他社装置</h2>
+<p class="desc">成約企業の標準／オプションの内訳と、商談先で使われている制震装置。</p>
+<div class="tablewrap"><table id="stdTable"></table></div>
+<div class="tablewrap" style="margin-top:14px"><table id="devTable"></table></div>
+</section>
+</div>
+</div>
+
+<!-- ===== CS ===== -->
+<div class="panel" data-panel="cs" hidden>
+<div class="cards" id="csCards"></div>
+<section>
+<h2>導入ステップごとの進捗</h2>
+<p class="desc">CSシートの各項目。「完了」「不要」「納品」を済みとして数えています（採用条件が「失注」の企業は除外）。期間指定には連動しません。</p>
+<div class="legend" id="csLegend"></div>
+<div id="csBars"></div>
+</section>
+<section>
+<h2>企業別の進捗一覧</h2>
+<p class="desc">更新日時が新しい順。</p>
+<div class="toolbar">
+<button class="chip" id="csOpenOnly" aria-pressed="true">未完了がある企業だけ</button>
+<input type="search" id="csSearch" placeholder="企業名で絞り込み" aria-label="企業の絞り込み">
+<span id="csCount"></span>
+</div>
+<div class="tablewrap tall"><table id="csTable"></table></div>
+</section>
+</div>
+
+<footer id="foot"></footer>
+</div>
+</div>
+
+<script>
+const ENC = {"s": "lKe9j4NyOgARexxnZfCpkA==", "i": "qAZXe9GnM/7cVeeV", "n": 200000, "c": "0lM6fmIX3XiB3xC/x7Jcvo/Q4W6mqxULei3a5BKiwqFadpnddQVWeqF8U2XGsrQBQMkQQCTkH8tDYfO6zmq5soFM9jAdBaRyaGPJJIc5ivQ6ZLVuF6IZj6RxypV4Ix6LUDOAgjL+IkvL+wBwGFCiYO+JwtepHMCEfZFEWkbz5UgssolEurWnBixJ70U7LpDvQUKeJpUksRUUIDwtVoM="};
+const b64b = b => Uint8Array.from(atob(b), c=>c.charCodeAt(0));
+async function unlockUrl(pass){
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:b64b(ENC.s), iterations:ENC.n, hash:'SHA-256'},
+    km, {name:'AES-GCM', length:256}, false, ['decrypt']);
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64b(ENC.i)}, key, b64b(ENC.c));
+  return new TextDecoder().decode(pt);
+}
+let CSV_URL = null;
+
+/* ---------- utils ---------- */
+function parseCSV(text){
+  const rows=[]; let row=[], f='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(f); f=''; }
+    else if(c==='\n'){ row.push(f); rows.push(row); row=[]; f=''; }
+    else if(c!=='\r') f+=c;
+  }
+  if(f!==''||row.length){ row.push(f); rows.push(row); }
+  return rows;
+}
+const T = v => String(v==null?'':v).replace(/\s+/g,' ').trim();
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toDate(s){
+  s=T(s); if(!s) return null;
+  let m=s.match(/^(\d{4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  if(/^\d{5}(\.\d+)?$/.test(s)){ const n=+s; if(n>30000 && n<60000){ const d=new Date(Date.UTC(1899,11,30)+Math.floor(n)*864e5); return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); } }
+  return null;
+}
+const idOf = v => { const t=T(v).replace(/\.0+$/,''); return /^\d+$/.test(t) ? t : ''; };
+const truthy = v => /^(true|1|✓|☑)$/i.test(T(v));
+const ymd = d => d ? `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}` : '';
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const mkey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+const pct = (a,b) => b ? (a/b*100).toFixed(1)+'%' : '—';
+const DAY = 864e5;
+const today = (()=>{ const t=new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); })();
+const daysAgo = d => Math.round((today - d)/DAY);
+function median(a){ if(!a.length) return null; const s=[...a].sort((x,y)=>x-y), m=s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ---------- build ---------- */
+const CS_ITEMS = [['初回CS',5],['基礎研修',7],['入力研修',9],['納品データ',11],['広告打合せ',14],['販促物依頼',15],['販促物送付',16],['受注表・顧客DB',17]];
+const PHASE_ORDER = ['成約','商談中','アポイント獲得済','アポイント獲得中','失注'];
+const ACT_PHASES = ['1.アポイント架電・説明','2.図面受け取り・解析見積','3.商談','4.契約','5.失注','6.アフター'];
+
+function build(text){
+  const R = parseCSV(text);
+  const g = (r,c) => (R[r] && R[r][c]!==undefined) ? R[r][c] : '';
+  if(!T(g(0,1)).includes('商談フェーズ') || !T(g(0,29)).includes('活動日'))
+    throw new Error('連携シートの列構成が想定と違います');
+  /* 顧客管理 → 企業単位 */
+  const byId = new Map(); const order=[];
+  const FIELDS = {src:0, phase:1, lead:3, meet:4, win:5, lost:6, upd:7, reg:8, name:11, rep:12, route2:13, pref:14, type1:15, type2:16, route:17, device:20, std:21};
+  for(let r=1;r<R.length;r++){
+    const id = idOf(g(r,9)); if(!id) continue;
+    const isComp = truthy(g(r,10));
+    const rec = {}; for(const k in FIELDS) rec[k]=T(g(r,FIELDS[k]));
+    if(!byId.has(id)){ byId.set(id,{id, comp:null, extra:[]}); order.push(id); }
+    const e=byId.get(id);
+    if(isComp && !e.comp) e.comp=rec; else e.extra.push(rec);
+  }
+  const companies=[];
+  for(const id of order){
+    const e=byId.get(id);
+    const base = e.comp || e.extra[0]; if(!base) continue;
+    const c = {id};
+    const pick = k => { if(base[k]) return base[k]; for(const x of e.extra){ if(x[k]) return x[k]; } return ''; };
+    for(const k in FIELDS) c[k]= (k==='lost') ? '' : pick(k);
+    c.lost = [base,...e.extra].some(x=>truthy(x.lost));
+    // フェーズ・日付は同じ行のセットで持つ（企業行が空なら担当者行から）
+    if(!base.phase){ const x=e.extra.find(x=>x.phase); if(x){ c.phase=x.phase; c.lead=x.lead; c.meet=x.meet; c.win=x.win; c.src=c.src||x.src; } }
+    c.lead=toDate(c.lead); c.meet=toDate(c.meet); c.win=toDate(c.win); c.upd=toDate(c.upd); c.reg=toDate(c.reg);
+    if(c.lost && c.phase!=='成約') c.phase='失注';
+    c.route = c.route || c.route2 || '';
+    if(!c.name) continue;
+    const p=c.phase;
+    c.stWin = p==='成約';
+    c.stMeet = c.stWin || p==='商談中' || (p==='失注' && !!c.meet) || !!c.meet;
+    c.stAppo = c.stMeet || p==='アポイント獲得済';
+    c.active = !!p;
+    const ds=[c.lead,c.meet,c.win].filter(Boolean);
+    c.first = ds.length ? new Date(Math.min(...ds)) : (c.active ? c.reg : null);
+    companies.push(c);
+  }
+  const compById = new Map(companies.map(c=>[c.id,c]));
+  /* アクション管理 */
+  const acts=[];
+  for(let r=1;r<R.length;r++){
+    const d=toDate(g(r,29)); if(!d) continue;
+    const cid=idOf(g(r,25));
+    const comp = compById.get(cid);
+    let ph=T(g(r,30)); if(!ACT_PHASES.includes(ph)) ph = ph ? 'その他' : '未分類';
+    acts.push({d, cid, name: (comp&&comp.name) || T(g(r,26)) || '（企業名なし）', phase:ph, body:T(g(r,31)), who:T(g(r,32))||'未記入'});
+  }
+  acts.sort((a,b)=>b.d-a.d);
+  const lastAct = new Map();
+  for(const a of acts){ if(a.cid && !lastAct.has(a.cid)) lastAct.set(a.cid,a); }
+  /* CS */
+  const cs=[];
+  for(let r=1;r<R.length;r++){
+    const name=T(g(r,36)); if(!name || name==='会社名') continue;
+    const o={id:idOf(g(r,35)), name, cond:T(g(r,37)), next:T(g(r,38)), upd:toDate(g(r,39)), ver:T(g(r,48)), items:{}};
+    CS_ITEMS.forEach(([k,c])=>{ o.items[k]=T(g(r,35+c)); });
+    cs.push(o);
+  }
+  return {companies, acts, lastAct, cs, compById};
+}
+
+/* ---------- state ---------- */
+let DATA=null, TAB='deal', FROM=null, TO=null, PRESET='all', FOLLOW='all', CS_OPEN=true;
+const inRange = d => d && (!FROM || d>=FROM) && (!TO || d<=TO);
+const PRESETS = [
+  ['all','全期間', ()=>[null,null]],
+  ['12m','直近12ヶ月', ()=>[new Date(today.getFullYear(), today.getMonth()-11, 1), today]],
+  ['ty', today.getFullYear()+'年', ()=>[new Date(today.getFullYear(),0,1), new Date(today.getFullYear(),11,31)]],
+  ['ly', (today.getFullYear()-1)+'年', ()=>[new Date(today.getFullYear()-1,0,1), new Date(today.getFullYear()-1,11,31)]],
+  ['3m','直近3ヶ月', ()=>[new Date(today.getFullYear(), today.getMonth()-2, 1), today]],
+  ['tm','今月', ()=>[new Date(today.getFullYear(), today.getMonth(), 1), today]],
+];
+function setPreset(k){
+  PRESET=k; const p=PRESETS.find(x=>x[0]===k); [FROM,TO]=p[2]();
+  document.getElementById('dFrom').value = FROM? iso(FROM):''; document.getElementById('dTo').value = TO? iso(TO):'';
+  renderAll();
+}
+function periodLabel(){ if(!FROM && !TO) return '全期間'; return `${FROM?ymd(FROM):'はじめ'} 〜 ${TO?ymd(TO):'今日'}`; }
+
+/* ---------- charts ---------- */
+const NS='http://www.w3.org/2000/svg';
+function el(t,a={},p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function txt(p,x,y,s,o={}){const t=el('text',Object.assign({x,y,fill:'var(--muted)','font-size':11},o),p);t.textContent=s;return t;}
+function niceMax(v){ if(v<=0) return 4; const e=Math.pow(10,Math.floor(Math.log10(v))), f=v/e;
+  const m=[1,1.2,1.5,2,2.5,3,4,5,6,8,10].find(x=>f<=x)||10; return Math.max(4, Math.ceil(m*e)); }
+function monthsBetween(a,b){ const out=[]; let d=new Date(a.getFullYear(),a.getMonth(),1); const end=new Date(b.getFullYear(),b.getMonth(),1);
+  while(d<=end){ out.push(new Date(d)); d=new Date(d.getFullYear(), d.getMonth()+1, 1); } return out; }
+function legend(host, items){ host.innerHTML = items.map(([n,c])=>`<span><i class="sw" style="background:${c}"></i>${esc(n)}</span>`).join(''); }
+
+/* series: [{name,color,values[]}] ; mode 'group' | 'stack' */
+function barChart(host, months, series, mode){
+  host.innerHTML='';
+  if(!months.length){ host.innerHTML='<p class="empty">この期間のデータはありません</p>'; return; }
+  const W=Math.max(320, host.clientWidth||900), H=260, m={l:34,r:8,t:12,b:34};
+  const iw=W-m.l-m.r, ih=H-m.t-m.b;
+  const totals = months.map((_,i)=> mode==='stack' ? series.reduce((s,x)=>s+x.values[i],0) : Math.max(...series.map(x=>x.values[i])));
+  const max=niceMax(Math.max(0,...totals));
+  const svg=el('svg',{viewBox:`0 0 ${W} ${H}`, role:'img'} ,host);
+  const y=v=> m.t+ih - v/max*ih;
+  const ticks=4;
+  for(let k=0;k<=ticks;k++){ const v=Math.round(max/ticks*k), yy=y(max/ticks*k);
+    el('line',{x1:m.l,x2:W-m.r,y1:yy,y2:yy,stroke:k? 'var(--grid)':'var(--axis)','stroke-width':1},svg);
+    txt(svg,m.l-6,yy+4,String(v),{'text-anchor':'end'}); }
+  const bw=iw/months.length;
+  const labEvery = Math.ceil(months.length / Math.max(1, Math.floor(iw/46)));
+  const tt=document.createElement('div'); tt.className='tt'; host.appendChild(tt);
+  months.forEach((mo,i)=>{
+    const x0=m.l+i*bw;
+    const pad = Math.min(bw*0.18, 8);
+    if(mode==='stack'){
+      const w=Math.max(2, Math.min(28, bw-pad*2)); const cx=x0+(bw-w)/2;
+      let acc=0; const segs=series.map(s=>({s,v:s.values[i]})).filter(o=>o.v>0);
+      segs.forEach((o,j)=>{
+        const y1=y(acc), y2=y(acc+o.v); acc+=o.v;
+        const hgt=Math.max(0,y1-y2-(j<segs.length-1?2:0)+ (j? 0:0));
+        const top = j===segs.length-1;
+        const r= top? Math.min(4,w/2,hgt):0;
+        const yy=y2 + (j<segs.length-1 ? 0 : 0);
+        const path = top
+          ? `M${cx},${y1} V${yy+r} Q${cx},${yy} ${cx+r},${yy} H${cx+w-r} Q${cx+w},${yy} ${cx+w},${yy+r} V${y1} Z`
+          : `M${cx},${y1} V${yy+2} H${cx+w} V${y1} Z`;
+        el('path',{d:path, fill:o.s.color},svg);
+      });
+    }else{
+      const n=series.length, gap=2;
+      const gw=Math.min(bw-pad*2, n*16+(n-1)*gap); const w=(gw-(n-1)*gap)/n; let cx=x0+(bw-gw)/2;
+      series.forEach(s=>{ const v=s.values[i]; if(v>0){ const yy=y(v), r=Math.min(4,w/2, y(0)-yy);
+          el('path',{d:`M${cx},${y(0)} V${yy+r} Q${cx},${yy} ${cx+r},${yy} H${cx+w-r} Q${cx+w},${yy} ${cx+w},${yy+r} V${y(0)} Z`, fill:s.color},svg);}
+        cx+=w+gap; });
+    }
+    if(i%labEvery===0){
+      const lab = (mo.getMonth()===0 || i===0) ? `${String(mo.getFullYear()).slice(2)}年${mo.getMonth()+1}月` : `${mo.getMonth()+1}月`;
+      txt(svg,x0+bw/2,H-m.b+16,lab,{'text-anchor':'middle'});
+    }
+    const hit=el('rect',{x:x0,y:m.t,width:bw,height:ih,fill:'transparent'},svg);
+    hit.addEventListener('mouseenter',()=>{
+      hit.setAttribute('fill','var(--ring)'); hit.setAttribute('fill-opacity','.5');
+      const rows = series.map(s=>`<div class="row"><span><i style="background:${s.color}"></i>${esc(s.name)}</span><b>${s.values[i]}</b></div>`).join('');
+      tt.innerHTML=`<b>${mo.getFullYear()}年${mo.getMonth()+1}月</b>${rows}` + (mode==='stack'?`<div class="row" style="border-top:1px solid var(--grid);margin-top:3px;padding-top:3px"><span>合計</span><b>${totals[i]}</b></div>`:'');
+      tt.style.opacity=1;
+      const hw=host.clientWidth, sx=hw/W, px=(x0+bw/2)*sx;
+      const tw=tt.offsetWidth; tt.style.left = Math.min(Math.max(0, px+12 > hw-tw ? px-tw-12 : px+12), hw-tw)+'px'; tt.style.top='8px';
+    });
+    hit.addEventListener('mouseleave',()=>{ hit.setAttribute('fill','transparent'); tt.style.opacity=0; });
+  });
+}
+function hbars(host, rows, colors, opts={}){
+  // rows: [{name, parts:[n...], label}]
+  if(!rows.length){ host.innerHTML='<p class="empty">データがありません</p>'; return; }
+  const max = opts.max || Math.max(1,...rows.map(r=>r.parts.reduce((a,b)=>a+b,0)));
+  host.innerHTML = rows.map(r=>{
+    const tot=r.parts.reduce((a,b)=>a+b,0);
+    const segs = r.parts.map((v,j)=> v>0 ? `<i style="width:calc(${v/max*100}% - 2px);background:${colors[j]}" title="${esc(opts.names? opts.names[j]+'：'+v : v)}"></i>` : '').join('');
+    return `<div class="hbar-row"><span class="nm" title="${esc(r.name)}">${esc(r.name)}</span><div class="hbar">${segs}</div><span class="n">${r.label!=null? r.label : tot}</span></div>`;
+  }).join('');
+}
+function table(host, head, rows, opts={}){
+  const th = head.map((h,i)=>`<th class="${(opts.left||[0]).includes(i)?'l':''}">${h}</th>`).join('');
+  host.innerHTML = `<thead><tr>${th}</tr></thead><tbody>${rows.join('') || `<tr><td class="l" colspan="${head.length}"><span class="empty">データがありません</span></td></tr>`}</tbody>`;
+}
+const rateCell = (a,b) => `<div class="rate">${b? `<span class="bar"><i style="width:${Math.min(100,a/b*100)}%"></i></span>`:''}<span>${pct(a,b)}</span></div>`;
+
+/* ---------- render: 商談 ---------- */
+function renderDeal(){
+  const C=DATA.companies;
+  const leads=C.filter(c=>inRange(c.lead)), meets=C.filter(c=>inRange(c.meet)), wins=C.filter(c=>c.stWin && inRange(c.win));
+  const meetWon = meets.filter(c=>c.stWin).length;
+  const cyc = wins.filter(c=>c.win && (c.lead||c.meet)).map(c=>(c.win-(c.lead||c.meet))/DAY).filter(x=>x>=0);
+  const md = median(cyc);
+  const nowDeal = C.filter(c=>c.phase==='商談中').length, nowAppo=C.filter(c=>c.phase==='アポイント獲得済').length;
+  const card=(lab,val,unit,note)=>`<div class="card"><div class="lab">${lab}</div><div class="val">${val}<small>${unit||''}</small></div>${note?`<div class="note">${note}</div>`:''}</div>`;
+  document.getElementById('dealCards').innerHTML =
+    card('リード発生', leads.length,'社','リード発生日が期間内') +
+    card('商談', meets.length,'社','商談日が期間内') +
+    card('成約', wins.length,'社','成約日が期間内') +
+    card('商談→成約率', pct(meetWon, meets.length),'', `期間内に商談した${meets.length}社のうち成約${meetWon}社`) +
+    card('成約までの日数', md==null?'—':Math.round(md),'日', `中央値（リード発生 or 商談日 → 成約日）${cyc.length}社`) +
+    card('いま商談中', nowDeal,'社', `ほかにアポ獲得済 ${nowAppo}社（全期間）`);
+
+  // monthly
+  const all=[...C.map(c=>c.lead),...C.map(c=>c.meet),...C.filter(c=>c.stWin).map(c=>c.win)].filter(Boolean);
+  let a=FROM, b=TO||today;
+  if(!a){ const mn=all.filter(d=>d>=new Date(2024,0,1)); a = mn.length? new Date(Math.min(...mn)) : today; }
+  if(b>today && all.every(d=>d<=today)) b=today;
+  const months = monthsBetween(a,b).slice(-48);
+  const cnt = (arr)=> months.map(mo=>arr.filter(d=>d && d.getFullYear()===mo.getFullYear() && d.getMonth()===mo.getMonth()).length);
+  const ser=[
+    {name:'リード発生', color:cssv('--s1'), values:cnt(C.map(c=>c.lead))},
+    {name:'商談', color:cssv('--s2'), values:cnt(C.map(c=>c.meet))},
+    {name:'成約', color:cssv('--s3'), values:cnt(C.filter(c=>c.stWin).map(c=>c.win))},
+  ];
+  legend(document.getElementById('dealLegend'), ser.map(s=>[s.name,s.color]));
+  barChart(document.getElementById('dealMonthly'), months, ser, 'group');
+
+  // funnel: companies whose first touch in range
+  const coh = C.filter(c=>c.active && (FROM||TO ? inRange(c.first) : true));
+  const st=[['対象企業',coh.length],['アポイント獲得',coh.filter(c=>c.stAppo).length],['商談',coh.filter(c=>c.stMeet).length],['成約',coh.filter(c=>c.stWin).length]];
+  document.getElementById('funnelDesc').textContent = (FROM||TO ? '期間内に最初の動きがあった' : '商談フェーズが入っている') + `企業${coh.length}社が、どこまで進んだか。％は1つ前の段階からの移行率。`;
+  const fc=[cssv('--r1'),cssv('--r2'),cssv('--r3'),cssv('--r4')];
+  const fh=document.getElementById('funnel');
+  hbars(fh, st.map(([n,v],i)=>({name:n, parts:[v], label: `${v}社` + (i? ` <span style="color:var(--muted)">${pct(v,st[i-1][1])}</span>`:'')})), [cssv('--s1')], {max:Math.max(1,coh.length)});
+  fh.querySelectorAll('.hbar i').forEach((x,i)=>x.style.background=fc[i]);
+  const lost = coh.filter(c=>c.phase==='失注').length;
+  fh.insertAdjacentHTML('beforeend', `<p class="desc" style="margin:10px 0 0">うち失注 ${lost}社 ／ 成約率（対象企業比）${pct(st[3][1], coh.length)}</p>`);
+
+  // phase now
+  const ph = PHASE_ORDER.map(p=>[p, C.filter(c=>c.phase===p).length]);
+  const none = C.filter(c=>!c.phase).length;
+  const pcol = {'成約':cssv('--s3'),'商談中':cssv('--s2'),'アポイント獲得済':cssv('--s1'),'アポイント獲得中':cssv('--r1'),'失注':cssv('--muted')};
+  const pn=document.getElementById('phaseNow');
+  hbars(pn, ph.map(([n,v])=>({name:n, parts:[v], label:`${v}社`})), ['x']);
+  pn.querySelectorAll('.hbar i').forEach((x,i)=>x.style.background=pcol[ph[i][0]]);
+  pn.insertAdjacentHTML('beforeend', `<p class="desc" style="margin:10px 0 0">フェーズ未入力（リストのみ）${none}社 ／ 登録企業 合計${C.length}社</p>`);
+
+  // source table
+  const groups=new Map();
+  coh.forEach(c=>{ const k=c.src||'（未入力）'; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(c); });
+  const rowsS=[...groups.entries()].sort((x,y)=>(x[0]==='（未入力）')-(y[0]==='（未入力）') || y[1].filter(c=>c.stWin).length - x[1].filter(c=>c.stWin).length || y[1].length-x[1].length);
+  const line=(k,arr,cls='')=>{ const mt=arr.filter(c=>c.stMeet).length, w=arr.filter(c=>c.stWin).length;
+    return `<tr class="${cls}"><td class="l">${esc(k)}</td><td>${arr.length}</td><td>${arr.filter(c=>c.stAppo).length}</td><td>${mt}</td><td>${arr.filter(c=>c.phase==='商談中').length}</td><td>${w}</td><td>${arr.filter(c=>c.phase==='失注').length}</td><td>${rateCell(w,mt)}</td></tr>`; };
+  table(document.getElementById('srcTable'), ['流入経路','社数','アポ獲得','商談','うち商談中','成約','失注','成約率'],
+    rowsS.map(([k,arr])=>line(k,arr)).concat(coh.length? [line('合計',coh,'total')]:[]));
+
+  renderFollow();
+}
+function lastTouch(c){
+  const a=DATA.lastAct.get(c.id);
+  const cands=[a&&a.d, c.upd, c.meet, c.lead].filter(Boolean);
+  const d = cands.length ? new Date(Math.max(...cands)) : null;
+  return {d, act:a};
+}
+function renderFollow(){
+  const list = DATA.companies.filter(c=> (c.phase==='商談中'||c.phase==='アポイント獲得済') && (FOLLOW==='all'||c.phase===FOLLOW))
+    .map(c=>Object.assign({c}, lastTouch(c)))
+    .sort((x,y)=>(x.d?x.d:0)-(y.d?y.d:0));
+  document.getElementById('followCount').textContent = `${list.length}社`;
+  table(document.getElementById('followTable'), ['企業名','フェーズ','流入経路','1次商流','商談日','最後の接触','経過','直近の活動内容'],
+    list.map(({c,d,act})=>{
+      const n = d? daysAgo(d) : null;
+      const cls = n==null? 'stale' : n>=60 ? 'stale' : n>=30 ? 'warmish' : '';
+      return `<tr><td class="l nw">${esc(c.name)}</td><td class="l nw"><span class="tag ${c.phase==='商談中'?'doing':''}">${esc(c.phase)}</span></td><td class="l nw">${esc(c.src||'—')}</td><td class="l nw">${esc(c.route||'—')}</td><td class="nw">${ymd(c.meet)||'—'}</td><td class="nw">${d?ymd(d):'記録なし'}</td><td class="nw ${cls}">${n==null?'—':n+'日'}</td><td class="l txt">${act? esc(act.body||act.phase) : '<span style="color:var(--muted)">アクション管理に記録なし</span>'}</td></tr>`;
+    }), {left:[0,1,2,3,7]});
+}
+
+/* ---------- render: 活動量 ---------- */
+function renderAct(){
+  const A=DATA.acts.filter(a=>inRange(a.d) || (!FROM&&!TO));
+  const comps=new Set(A.map(a=>a.cid||a.name));
+  const card=(lab,val,unit,note)=>`<div class="card"><div class="lab">${lab}</div><div class="val">${val}<small>${unit||''}</small></div>${note?`<div class="note">${note}</div>`:''}</div>`;
+  const months = (()=>{ let a=FROM, b=TO||today; if(!a){ a = A.length? new Date(Math.min(...A.filter(x=>x.d>=new Date(2024,0,1)).map(x=>x.d))) : today; } if(b>today) b=today; return monthsBetween(a,b).slice(-48); })();
+  const perMonth = months.length ? A.length/months.length : 0;
+  document.getElementById('actCards').innerHTML =
+    card('活動件数', A.length,'件', periodLabel()) +
+    card('活動した企業', comps.size,'社') +
+    card('月あたり', perMonth? perMonth.toFixed(1):'—','件', `${months.length}ヶ月で割った平均`) +
+    card('商談・契約の活動', A.filter(a=>a.phase==='3.商談'||a.phase==='4.契約').length,'件','フェーズ 3.商談＋4.契約') +
+    card('最新の活動日', DATA.acts.length? ymd(DATA.acts[0].d):'—','', DATA.acts.length? `${daysAgo(DATA.acts[0].d)}日前（全期間）`:'');
+  const phs=[...ACT_PHASES]; if(A.some(a=>a.phase==='その他')) phs.push('その他'); if(A.some(a=>a.phase==='未分類')) phs.push('未分類');
+  const cols=['--s1','--s2','--s3','--s4','--s5','--s6'].map(cssv).concat([cssv('--axis'), cssv('--muted')]);
+  const ser = phs.map((p,j)=>({name:p.replace(/^\d\./,''), color:cols[j], values: months.map(mo=>A.filter(a=>a.phase===p && a.d.getFullYear()===mo.getFullYear() && a.d.getMonth()===mo.getMonth()).length)}));
+  legend(document.getElementById('actLegend'), ser.map(s=>[s.name,s.color]));
+  barChart(document.getElementById('actMonthly'), months, ser, 'stack');
+
+  // rep table
+  const reps=new Map(); A.forEach(a=>{ if(!reps.has(a.who)) reps.set(a.who,[]); reps.get(a.who).push(a); });
+  const repRows=[...reps.entries()].sort((x,y)=> (x[0]==='未記入') - (y[0]==='未記入') || y[1].length-x[1].length);
+  table(document.getElementById('actRep'), ['担当者','合計',...ACT_PHASES.map(p=>p.replace(/^\d\./,'').replace('アポイント架電・説明','アポ架電').replace('図面受け取り・解析見積','図面・見積'))],
+    repRows.map(([k,arr])=>`<tr><td class="l nw">${esc(k)}</td><td><b>${arr.length}</b></td>${ACT_PHASES.map(p=>`<td>${arr.filter(a=>a.phase===p).length||'<span style="color:var(--muted)">·</span>'}</td>`).join('')}</tr>`));
+  // top companies
+  const tc=new Map(); A.forEach(a=>{ if(a.name==='（企業名なし）') return; const k=a.cid||a.name; if(!tc.has(k)) tc.set(k,{name:a.name, n:0, last:a.d, cid:a.cid}); const o=tc.get(k); o.n++; if(a.d>o.last) o.last=a.d; });
+  const top=[...tc.values()].sort((x,y)=>y.n-x.n || y.last-x.last).slice(0,15);
+  table(document.getElementById('actTop'), ['企業名','件数','最新','ステータス'],
+    top.map(o=>{ const c=DATA.compById.get(o.cid); return `<tr><td class="l nw">${esc(c?c.name:o.name)}</td><td>${o.n}</td><td class="nw">${ymd(o.last)}</td><td class="l nw">${c&&c.phase? `<span class="tag ${c.phase==='成約'?'done':c.phase==='失注'?'lost':'doing'}">${esc(c.phase)}</span>`:'—'}</td></tr>`; }), {left:[0,3]});
+  renderActList();
+}
+function renderActList(){
+  const q=T(document.getElementById('actSearch').value).toLowerCase();
+  const A=DATA.acts.filter(a=>(inRange(a.d)||(!FROM&&!TO)) && (!q || (a.name+' '+a.body+' '+a.who).toLowerCase().includes(q))).slice(0,100);
+  table(document.getElementById('actList'), ['活動日','企業名','フェーズ','活動内容','担当'],
+    A.map(a=>`<tr><td class="nw">${ymd(a.d)}</td><td class="l nw">${esc(a.name)}</td><td class="l nw"><span class="tag">${esc(a.phase)}</span></td><td class="l txt">${esc(a.body)}</td><td class="l nw">${esc(a.who)}</td></tr>`),
+    {left:[1,2,3,4]});
+}
+
+/* ---------- render: 商流・エリア ---------- */
+function renderArea(){
+  const C=DATA.companies.filter(c=>c.active && (FROM||TO ? inRange(c.first) : true));
+  const card=(lab,val,unit,note)=>`<div class="card"><div class="lab">${lab}</div><div class="val">${val}<small>${unit||''}</small></div>${note?`<div class="note">${note}</div>`:''}</div>`;
+  const prefs=new Set(C.map(c=>c.pref).filter(Boolean));
+  const routes=new Set(C.map(c=>c.route).filter(r=>r && !/直取引/.test(r)));
+  const direct=C.filter(c=>c.type1==='直取店'), dist=C.filter(c=>c.type1==='流通店');
+  document.getElementById('areaCards').innerHTML =
+    card('対象企業', C.length,'社', FROM||TO ? '期間内に最初の動きがあった企業' : '商談フェーズが入っている企業') +
+    card('都道府県', prefs.size,'', '郵送先の都道府県数') +
+    card('商流（問屋など）', routes.size,'社', '直取引を除く1次商流') +
+    card('直取店の成約', direct.filter(c=>c.stWin).length,'社', `直取店 ${direct.length}社中`) +
+    card('流通店の成約', dist.filter(c=>c.stWin).length,'社', `流通店 ${dist.length}社中`);
+  const grp=(key)=>{ const m=new Map(); C.forEach(c=>{ const k=key(c)||'（未入力）'; if(!m.has(k)) m.set(k,[]); m.get(k).push(c); }); return [...m.entries()]; };
+  const row=(k,arr,cls='')=>{ const mt=arr.filter(c=>c.stMeet).length, w=arr.filter(c=>c.stWin).length;
+    return `<tr class="${cls}"><td class="l nw">${esc(k)}</td><td>${arr.length}</td><td>${arr.filter(c=>c.phase==='アポイント獲得済'||c.phase==='アポイント獲得中').length}</td><td>${arr.filter(c=>c.phase==='商談中').length}</td><td>${w}</td><td>${arr.filter(c=>c.phase==='失注').length}</td><td>${rateCell(w,mt)}</td></tr>`; };
+  const sortG = g => g.sort((x,y)=> (x[0]==='（未入力）')-(y[0]==='（未入力）') || y[1].filter(c=>c.stWin).length-x[1].filter(c=>c.stWin).length || y[1].length-x[1].length);
+  const H=['','社数','アポ','商談中','成約','失注','成約率'];
+  table(document.getElementById('routeTable'), ['1次商流',...H.slice(1)], sortG(grp(c=>c.route)).map(([k,a])=>row(k,a)).concat(C.length?[row('合計',C,'total')]:[]));
+  // pref bars
+  const pc=[cssv('--s3'),cssv('--s2'),cssv('--s1'),cssv('--axis')];
+  const pn=['成約','商談中','アポ','その他（失注など）'];
+  legend(document.getElementById('prefLegend'), pn.map((n,i)=>[n,pc[i]]));
+  const pg=grp(c=>c.pref).filter(([k])=>k!=='（未入力）').sort((x,y)=>y[1].length-x[1].length).slice(0,20);
+  hbars(document.getElementById('prefBars'), pg.map(([k,a])=>{ const w=a.filter(c=>c.stWin).length, d=a.filter(c=>c.phase==='商談中').length, ap=a.filter(c=>/アポイント/.test(c.phase)).length;
+    return {name:k, parts:[w,d,ap,a.length-w-d-ap], label:`${a.length}社`}; }), pc, {names:pn});
+  const noPref=C.filter(c=>!c.pref).length;
+  if(noPref) document.getElementById('prefBars').insertAdjacentHTML('beforeend',`<p class="desc" style="margin:8px 0 0">都道府県が未入力の企業：${noPref}社</p>`);
+  // type
+  table(document.getElementById('typeTable'), ['区分',...H.slice(1)],
+    sortG(grp(c=>c.type1)).map(([k,a])=>row(k,a)).concat(sortG(grp(c=>c.type2)).map(([k,a])=>row(k==='（未入力）'?'（新築/リフォーム未入力）':k,a))));
+  // std/option
+  const W=C.filter(c=>c.stWin);
+  const sg=grp(c=>c.std).filter(()=>true).map(([k,a])=>[k,a.filter(c=>c.stWin)]).filter(([,a])=>a.length).sort((x,y)=>(x[0]==='（未入力）')-(y[0]==='（未入力）')||y[1].length-x[1].length);
+  table(document.getElementById('stdTable'), ['成約企業の採用形態','社数','割合'], sg.map(([k,a])=>`<tr><td class="l">${esc(k)}</td><td>${a.length}</td><td>${rateCell(a.length,W.length)}</td></tr>`));
+  const dg=new Map(); C.filter(c=>c.stMeet && c.device).forEach(c=>{ const k=c.device.replace(/\s+/g,'').replace(/^無し$/,'なし'); dg.set(k,(dg.get(k)||0)+1); });
+  const drows=[...dg.entries()].sort((x,y)=>y[1]-x[1]).slice(0,12);
+  table(document.getElementById('devTable'), ['商談先の導入制震装置','社数'], drows.map(([k,n])=>`<tr><td class="l">${esc(k)}</td><td>${n}</td></tr>`));
+}
+
+/* ---------- render: CS ---------- */
+const csState = v => { v=T(v); if(!v) return 'none'; if(/失注/.test(v)) return 'lost'; if(/^(完了|不要|納品|掲載完了|済|〇|○)/.test(v) || /完了$/.test(v) && !/未完了/.test(v)) return 'done'; if(/未完了|対応予定|未/.test(v)) return 'todo'; return 'doing'; };
+function renderCS(){
+  const L=DATA.cs.filter(o=>!/失注/.test(o.cond));
+  const done = k => L.filter(o=>csState(o.items[k])==='done').length;
+  const allDone = L.filter(o=>CS_ITEMS.slice(0,4).every(([k])=>csState(o.items[k])==='done')).length;
+  const card=(lab,val,unit,note)=>`<div class="card"><div class="lab">${lab}</div><div class="val">${val}<small>${unit||''}</small></div>${note?`<div class="note">${note}</div>`:''}</div>`;
+  document.getElementById('csCards').innerHTML =
+    card('CS対象', L.length,'社', `標準採用 ${L.filter(o=>/標準/.test(o.cond)).length}社 ／ オプション ${L.filter(o=>/オプション/.test(o.cond)).length}社`) +
+    card('初回CS 済', done('初回CS'),'社', pct(done('初回CS'),L.length)) +
+    card('基礎研修 済', done('基礎研修'),'社', pct(done('基礎研修'),L.length)) +
+    card('入力研修 済', done('入力研修'),'社', pct(done('入力研修'),L.length)) +
+    card('立ち上げ4項目 済', allDone,'社', '初回CS・基礎研修・入力研修・納品データ');
+  const cols=[cssv('--good'), cssv('--s1'), cssv('--warn'), cssv('--track')];
+  const names=['済','対応中','対応予定・未完了','空欄'];
+  legend(document.getElementById('csLegend'), names.map((n,i)=>[n,cols[i]]));
+  hbars(document.getElementById('csBars'), CS_ITEMS.map(([k])=>{ const s=L.map(o=>csState(o.items[k]));
+    const d=s.filter(x=>x==='done').length, g=s.filter(x=>x==='doing').length, t=s.filter(x=>x==='todo').length;
+    return {name:k, parts:[d,g,t,L.length-d-g-t], label:pct(d,L.length)}; }), cols, {names, max:Math.max(1,L.length)});
+  renderCSTable();
+}
+function renderCSTable(){
+  const q=T(document.getElementById('csSearch').value).toLowerCase();
+  let L=DATA.cs.filter(o=>!/失注/.test(o.cond));
+  if(CS_OPEN) L=L.filter(o=>CS_ITEMS.some(([k])=>{ const s=csState(o.items[k]); return s==='todo'||s==='doing'; }) || CS_ITEMS.every(([k])=>!o.items[k]));
+  if(q) L=L.filter(o=>o.name.toLowerCase().includes(q));
+  L.sort((a,b)=>(b.upd||0)-(a.upd||0));
+  document.getElementById('csCount').textContent=`${L.length}社`;
+  const tag=v=>{ const s=csState(v); return v? `<span class="tag ${s}">${esc(v.length>8? v.slice(0,8)+'…':v)}</span>` : '<span class="tag none">—</span>'; };
+  table(document.getElementById('csTable'), ['企業名','採用条件','更新日','次回予定',...CS_ITEMS.map(x=>x[0])],
+    L.map(o=>`<tr><td class="l nw">${esc(o.name)}</td><td class="l nw">${esc(o.cond||'—')}</td><td class="nw">${o.upd?ymd(o.upd):'—'}</td><td class="l txt" style="min-width:160px">${esc(o.next||'')}</td>${CS_ITEMS.map(([k])=>`<td class="l" title="${esc(o.items[k])}">${tag(o.items[k])}</td>`).join('')}</tr>`),
+    {left:[0,1,3,4,5,6,7,8,9,10,11]});
+}
+
+/* ---------- wiring ---------- */
+function renderAll(){
+  if(!DATA) return;
+  document.querySelectorAll('#presets .chip').forEach(b=>b.setAttribute('aria-pressed', b.dataset.p===PRESET));
+  const pn=document.getElementById('periodnote');
+  pn.textContent = TAB==='cs' ? '導入後CSは期間指定に連動しません（現在の状態を表示）' : `表示期間：${periodLabel()}`;
+  document.getElementById('periodbar').style.opacity = TAB==='cs' ? .45 : 1;
+  ({deal:renderDeal, act:renderAct, area:renderArea, cs:renderCS})[TAB]();
+}
+document.getElementById('presets').innerHTML = PRESETS.map(p=>`<button class="chip" data-p="${p[0]}" aria-pressed="false">${p[1]}</button>`).join(' ');
+document.getElementById('presets').addEventListener('click', e=>{ const b=e.target.closest('.chip'); if(b) setPreset(b.dataset.p); });
+['dFrom','dTo'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{
+  const f=document.getElementById('dFrom').value, t=document.getElementById('dTo').value;
+  FROM = f? new Date(f+'T00:00:00') : null; TO = t? new Date(t+'T00:00:00') : null; PRESET=''; renderAll(); }));
+document.querySelector('.tabs').addEventListener('click', e=>{ const b=e.target.closest('button'); if(!b) return;
+  TAB=b.dataset.tab; document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected', x===b));
+  document.querySelectorAll('.panel').forEach(p=>p.hidden = p.dataset.panel!==TAB);
+  try{ sessionStorage.setItem('sd_tab',TAB); }catch(e){}
+  renderAll(); });
+document.querySelectorAll('[data-follow]').forEach(b=>b.addEventListener('click',()=>{ FOLLOW=b.dataset.follow;
+  document.querySelectorAll('[data-follow]').forEach(x=>x.setAttribute('aria-pressed', x===b)); renderFollow(); }));
+document.getElementById('actSearch').addEventListener('input', ()=>DATA&&renderActList());
+document.getElementById('csSearch').addEventListener('input', ()=>DATA&&renderCSTable());
+document.getElementById('csOpenOnly').addEventListener('click', e=>{ CS_OPEN=!CS_OPEN; e.target.setAttribute('aria-pressed',CS_OPEN); renderCSTable(); });
+
+function setStatus(kind,msg){ const s=document.getElementById('status'); s.className='status '+kind; s.textContent=msg; }
+async function load(){
+  setStatus('loading','スプレッドシートから読み込み中…');
+  try{
+    const res = await fetch(CSV_URL + (CSV_URL.includes('?')?'&':'?') + '_=' + Date.now(), {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    DATA = build(await res.text());
+    renderAll();
+    const t=new Date();
+    setStatus('ok', `最新データ ／ 取得 ${t.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}　（企業 ${DATA.companies.length}社・活動 ${DATA.acts.length}件・CS ${DATA.cs.length}社）`);
+    document.getElementById('foot').innerHTML = '集計ルール：企業は「会社ID」単位で1社として数えます（企業判定＝TRUE の行を代表に、空欄は同じ会社IDの担当者行で補完）。失注チェックが付いた企業は成約以外なら「失注」扱い。データは Google スプレッドシートから開くたびに最新を読み込みます（反映まで数分かかることがあります）。';
+  }catch(e){
+    setStatus('warn','スプレッドシートを読み込めませんでした（'+e.message+'）。「最新に更新」を押すか、しばらくしてから再読み込みしてください。');
+  }
+}
+document.getElementById('reload').onclick = load;
+const gate=document.getElementById('gate'), gerr=document.getElementById('gateerr');
+async function tryUnlock(pass){
+  let url; try{ url = await unlockUrl(pass); }catch(e){ return false; }
+  if(!/^https:\/\/docs\.google\.com\//.test(url)) return false;
+  CSV_URL=url; gate.hidden=true;
+  document.getElementById('body').hidden=false; document.getElementById('statusrow').hidden=false;
+  try{ sessionStorage.setItem('sd_pass', pass); }catch(e){}
+  await load(); return true;
+}
+document.getElementById('gateform').addEventListener('submit', async e=>{
+  e.preventDefault(); const btn=e.target.querySelector('button'), inp=document.getElementById('pass');
+  btn.disabled=true; gerr.hidden=true; const ok=await tryUnlock(inp.value.trim()); btn.disabled=false;
+  if(!ok){ gerr.hidden=false; inp.select(); }
+});
+(async ()=>{
+  try{ const t=sessionStorage.getItem('sd_tab'); if(t){ const b=document.querySelector(`.tabs button[data-tab="${t}"]`); if(b){ TAB=t; document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected', x===b)); document.querySelectorAll('.panel').forEach(p=>p.hidden=p.dataset.panel!==TAB);} } }catch(e){}
+  setPreset('all');
+  let saved=null; try{ saved=sessionStorage.getItem('sd_pass'); }catch(e){}
+  if(saved) await tryUnlock(saved);
+  if(!gate.hidden) document.getElementById('pass').focus();
+})();
+let rt; addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(renderAll,180); });
+</script>
+</body>
+</html>

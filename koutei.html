@@ -10,36 +10,32 @@
 <style>
 :root{
   --paper:#EFEFEA; --card:#FFFFFF; --ink:#181D1A; --muted:#6C736E; --rule:#D9DAD3;
-  --sales:#1F6E6B; --design:#3D5A98; --ic:#8E4A6E; --const:#A2701F; --hand:#5E6B57;
+  --sales:#1F6E6B; --design:#3D5A98; --design2:#7183B5; --icwait:#C08FA6; --ic:#8E4A6E;
+  --const:#A2701F; --hand:#5E6B57; --pr:#8A6A3D; --cs:#3E7A63;
   --late:#B0432C; --ok:#2E7D5B;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-body{
-  background:var(--paper); color:var(--ink);
+body{background:var(--paper);color:var(--ink);
   font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-  font-size:15px; line-height:1.65; -webkit-font-smoothing:antialiased;
-  font-feature-settings:"palt" 1;
-}
+  font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased;font-feature-settings:"palt" 1}
 .wrap{max-width:1120px;margin:0 auto;padding:36px 24px 96px}
 .num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 
-/* header */
 header{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;justify-content:space-between;
   padding-bottom:20px;border-bottom:2px solid var(--ink)}
-h1{font-size:27px;font-weight:700;margin:0;letter-spacing:.01em}
+h1{font-size:27px;font-weight:700;margin:0}
 .sub{color:var(--muted);font-size:13.5px;margin-top:5px}
 .count{text-align:right;line-height:1.2}
 .count b{font-size:40px;font-weight:700;display:block}
 .count span{font-size:12.5px;color:var(--muted)}
 
-/* filters */
 .filters{display:flex;flex-wrap:wrap;gap:26px;margin:20px 0 34px}
-.fgroup{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.fgroup>i{font-style:normal;font-size:12px;color:var(--muted);margin-right:2px}
+.fgroup{display:flex;align-items:center;gap:8px}
+.fgroup>i{font-style:normal;font-size:12px;color:var(--muted)}
 select.sel{font:inherit;font-size:13.5px;padding:7px 34px 7px 12px;border:1px solid var(--rule);
-  background:var(--card);color:var(--ink);cursor:pointer;border-radius:2px;min-width:150px;
-  appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='11' height='7'><path d='M1 1l4.5 4.5L10 1' fill='none' stroke='%236C736E' stroke-width='1.6'/></svg>");
+  background:var(--card);color:var(--ink);cursor:pointer;border-radius:2px;min-width:150px;appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='11' height='7'><path d='M1 1l4.5 4.5L10 1' fill='none' stroke='%236C736E' stroke-width='1.6'/></svg>");
   background-repeat:no-repeat;background-position:right 12px center}
 select.sel:hover{border-color:var(--ink)}
 select.sel:focus-visible{outline:2px solid var(--sales);outline-offset:2px}
@@ -48,7 +44,6 @@ h2{font-size:16px;font-weight:700;margin:0 0 4px}
 .note{font-size:12.5px;color:var(--muted);margin:0 0 16px}
 section{margin-bottom:52px}
 
-/* pipeline */
 .pipe{background:var(--card);border:1px solid var(--rule);padding:26px 26px 20px}
 .pipebar{display:flex;height:56px;width:100%;overflow:hidden}
 .seg{position:relative;display:flex;align-items:center;justify-content:center;color:#fff;min-width:2px}
@@ -58,7 +53,7 @@ section{margin-bottom:52px}
 .lg{display:grid;grid-template-columns:14px 1fr 110px;gap:0 14px;align-items:start;
   padding:14px 0;border-bottom:1px solid var(--rule)}
 .lg>i{width:14px;height:14px;display:block;margin-top:4px}
-.lg .who{font-size:11.5px;color:var(--muted);margin-bottom:1px}
+.lg .who{font-size:11.5px;color:var(--muted)}
 .lg .ttl{font-size:14.5px;font-weight:500}
 .lg .desc{font-size:12.5px;color:var(--muted);margin-top:2px;max-width:60ch}
 .lg .amt{text-align:right;line-height:1.25}
@@ -70,16 +65,14 @@ section{margin-bottom:52px}
 .total b{font-size:34px;font-weight:700}
 .total span{font-size:13px;color:var(--muted);margin-left:6px}
 
-/* kpi */
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--rule);
-  border:1px solid var(--rule)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;
+  background:var(--rule);border:1px solid var(--rule)}
 .kpi{background:var(--card);padding:16px 18px}
 .kpi .k{font-size:12.5px;color:var(--muted)}
 .kpi .v{font-size:31px;font-weight:700;line-height:1.25}
 .kpi .v s{text-decoration:none;font-size:14px;font-weight:500;color:var(--muted);margin-left:3px}
 .kpi .m{font-size:11.5px;color:var(--muted)}
 
-/* delay */
 .delays{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
 .dl{background:var(--card);border:1px solid var(--rule);padding:15px 17px}
 .dl .k{font-size:13px;font-weight:500}
@@ -87,9 +80,32 @@ section{margin-bottom:52px}
 .dl .v.ok{color:var(--ok)}
 .dl .m{font-size:11.5px;color:var(--muted)}
 .dlbar{height:6px;background:#E7E7E1;margin:9px 0 7px;position:relative}
-.dlbar i{position:absolute;left:0;top:0;bottom:0;background:var(--late);display:block}
+.dlbar i{position:absolute;left:0;top:0;bottom:0;display:block}
 
-/* person blocks */
+.loadgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.lcard{background:var(--card);border:1px solid var(--rule);padding:18px 20px 16px}
+.lcard .btag{display:inline-block;margin-bottom:12px}
+.lhead{display:grid;grid-template-columns:96px 1fr 58px 58px;gap:10px;font-size:11px;color:var(--muted);
+  padding-bottom:5px;margin-bottom:3px;border-bottom:1px solid var(--rule)}
+.lhead span:nth-child(3),.lhead span:nth-child(4){text-align:right}
+.lrow{display:grid;grid-template-columns:96px 1fr 58px 58px;align-items:center;gap:10px;padding:3px 0;
+  width:100%;background:none;border:none;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.lrow:hover .nm{text-decoration:underline;text-underline-offset:3px}
+.lrow:focus-visible{outline:2px solid var(--sales);outline-offset:2px}
+.lrow .nm{font-size:13px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lrow .tr{background:#EDEDE7;height:18px;position:relative}
+.lrow .tr i{position:absolute;left:0;top:0;bottom:0;display:block;opacity:.35}
+.lrow .tr b{position:absolute;left:0;top:0;bottom:0;display:block}
+.lrow .ct{font-size:13px;font-variant-numeric:tabular-nums;text-align:right}
+.lrow .ct b{font-size:16px;font-weight:700}
+.lrow .ct.dim{color:var(--muted)}
+.ldetail{margin:4px 0 10px;border-left:2px solid var(--rule);padding:4px 0 4px 12px}
+.ldetail .dh{font-size:11px;color:var(--muted);margin:6px 0 2px}
+.ldetail .dh:first-child{margin-top:0}
+.ldetail .it{display:grid;grid-template-columns:1fr auto;gap:10px;font-size:12px;color:var(--muted);padding:2px 0}
+.ldetail .it b{font-weight:400;color:var(--ink)}
+.lfoot{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.5}
+
 .block{background:var(--card);border:1px solid var(--rule);padding:22px 24px 18px;margin-bottom:18px}
 .bhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .btag{font-size:12px;font-weight:700;color:#fff;padding:3px 9px}
@@ -101,15 +117,10 @@ button.tab:focus-visible{outline:2px solid var(--sales);outline-offset:2px}
 .rows{display:flex;flex-direction:column;gap:7px}
 .row{display:grid;grid-template-columns:14px 132px 1fr 92px;align-items:center;gap:12px;
   width:100%;background:none;border:none;font:inherit;color:inherit;padding:2px 0;cursor:pointer;text-align:left}
-.row:hover .rname{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.row:hover .rname{text-decoration:underline;text-underline-offset:3px}
 .row:focus-visible{outline:2px solid var(--sales);outline-offset:2px}
 .caret{font-size:10px;color:var(--muted);transition:transform .12s;line-height:1}
 .row[aria-expanded="true"] .caret{transform:rotate(90deg)}
-.detail{margin:2px 0 10px 158px;border-left:2px solid var(--rule);padding:2px 0 2px 14px}
-.detail div{display:grid;grid-template-columns:1fr 70px;gap:10px;font-size:12.5px;
-  color:var(--muted);padding:3px 0}
-.detail div span:last-child{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
-.detail .dh{font-size:11.5px;padding-bottom:4px}
 .rname{font-size:13.5px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rtrack{background:#EDEDE7;height:23px;position:relative}
 .rtrack i{position:absolute;left:0;top:0;bottom:0;display:block}
@@ -117,38 +128,39 @@ button.tab:focus-visible{outline:2px solid var(--sales);outline-offset:2px}
 .rval{font-size:13.5px}
 .rval b{font-size:17px;font-weight:700}
 .rval span{color:var(--muted);font-size:11.5px;margin-left:4px}
+.detail{margin:2px 0 10px 158px;border-left:2px solid var(--rule);padding:2px 0 2px 14px}
+.detail div{display:grid;grid-template-columns:1fr 70px;gap:10px;font-size:12.5px;color:var(--muted);padding:3px 0}
+.detail div span:last-child{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+.detail .dh{font-size:11.5px;padding-bottom:4px}
 .avgnote{font-size:11.5px;color:var(--muted);margin-top:11px}
 .empty{font-size:13px;color:var(--muted);padding:6px 0}
 
-/* table */
-table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--rule)}
-th,td{text-align:left;padding:9px 12px;font-size:13px;border-bottom:1px solid var(--rule);vertical-align:middle}
+table{width:100%;border-collapse:collapse;background:var(--card)}
+th,td{text-align:left;padding:9px 12px;font-size:13px;border-bottom:1px solid var(--rule)}
 th{font-size:11.5px;color:var(--muted);font-weight:500;background:#F7F7F3;position:sticky;top:0}
 tbody tr:last-child td{border-bottom:none}
 td.n{font-variant-numeric:tabular-nums}
 .phase{display:inline-block;font-size:11.5px;color:#fff;padding:2px 8px;white-space:nowrap}
 .scroll{max-height:520px;overflow:auto;border:1px solid var(--rule)}
-.scroll table{border:none}
+footer{font-size:12px;color:var(--muted);border-top:1px solid var(--rule);padding-top:16px;margin-top:40px}
+
 #gate{min-height:70vh;display:flex;align-items:center;justify-content:center;padding:40px 0}
-.gatebox{background:var(--card);border:1px solid var(--rule);padding:34px 34px 30px;max-width:420px;width:100%}
+#gate[hidden]{display:none}
+#app[hidden]{display:none}
+.gatebox{background:var(--card);border:1px solid var(--rule);padding:34px;max-width:420px;width:100%}
 .gatebox h2{font-size:18px;margin-bottom:6px}
 .gatebox p{font-size:13px;color:var(--muted);margin:0 0 20px}
 .gatebox input{font:inherit;font-size:15px;width:100%;padding:10px 12px;border:1px solid var(--rule);
   background:var(--paper);border-radius:2px}
-.gatebox input:focus-visible{outline:2px solid var(--sales);outline-offset:1px}
 .gatebox button{font:inherit;font-size:14px;font-weight:500;margin-top:12px;width:100%;padding:11px;
   background:var(--ink);color:var(--paper);border:none;border-radius:2px;cursor:pointer}
 .gatebox button:hover{background:var(--sales)}
-.gatebox button:disabled{opacity:.5;cursor:default}
 .gerr{font-size:13px;color:var(--late);margin-top:12px;min-height:1.2em}
-#app[hidden]{display:none}
-footer{font-size:12px;color:var(--muted);border-top:1px solid var(--rule);padding-top:16px;margin-top:40px}
 @media(max-width:640px){
-  .row{grid-template-columns:96px 1fr 78px;gap:8px}
+  .row{grid-template-columns:14px 96px 1fr 78px;gap:8px}
   .seg b{font-size:15px}
   h1{font-size:22px}
 }
-@media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
@@ -158,14 +170,13 @@ footer{font-size:12px;color:var(--muted);border-top:1px solid var(--rule);paddin
   <div class="gatebox">
     <h2>THE HAUS 工程進捗ダッシュボード</h2>
     <p>お客様のお名前が含まれるため、合言葉を入れてください。</p>
-    <input id="pw" type="password" placeholder="合言葉" inputmode="numeric" autocomplete="off" spellcheck="false">
+    <input id="pw" type="password" inputmode="numeric" placeholder="合言葉" autocomplete="off" spellcheck="false">
     <button id="unlock">ひらく</button>
     <div class="gerr" id="gerr"></div>
   </div>
 </div>
 
 <div id="app" hidden>
-
 <header>
   <div>
     <h1>THE HAUS 工程進捗ダッシュボード</h1>
@@ -182,7 +193,7 @@ footer{font-size:12px;color:var(--muted);border-top:1px solid var(--rule);paddin
 
 <section>
   <h2>標準的な流れ</h2>
-  <p class="note">設計申込から引渡しまでを5つの区間に分け、それぞれの平均日数を帯の長さで表しています。</p>
+  <p class="note">設計申込から引渡しまでを6つの区間に分け、それぞれの平均日数を帯の長さで表しています。</p>
   <div class="pipe">
     <div class="pipebar" id="pipeBar"></div>
     <div class="legend" id="pipeAxis"></div>
@@ -205,6 +216,12 @@ footer{font-size:12px;color:var(--muted);border-top:1px solid var(--rule);paddin
 </section>
 
 <section>
+  <h2>担当ごとの受け持ち件数</h2>
+  <p class="note">担当ごとに完了の判定を変えています（意匠設計はプラン確定、それ以外は最終清算書の実施日）。濃い部分が進行中です。担当者名を押すと物件名が出ます。</p>
+  <div class="loadgrid" id="loads"></div>
+</section>
+
+<section>
   <h2>担当者別の所要日数</h2>
   <p class="note">棒の中の縦線は全体平均です。担当者名を押すと、その内訳の物件名と日数が出ます。件数が少ない担当者は数字が振れやすいので、かっこ内の件数と合わせて見てください。</p>
   <div id="blocks"></div>
@@ -212,10 +229,10 @@ footer{font-size:12px;color:var(--muted);border-top:1px solid var(--rule);paddin
 
 <section>
   <h2>物件ごとの現在地</h2>
-  <p class="note">最後に実施日が入っている工程と、そこからの経過日数です。経過が長い案件は工程が止まっているか、実施日の入力が抜けています。</p>
+  <p class="note">最後に実施日が入っている工程と、そこからの経過日数です。経過が長い案件は工程が止まっているか、実施日の入力が抜けています。<br><span id="tnote"></span></p>
   <div class="scroll">
     <table>
-      <thead><tr><th>物件</th><th>期</th><th>エリア</th><th>直近の工程</th><th>経過</th><th>営業</th><th>設計</th><th>IC</th><th>工事</th></tr></thead>
+      <thead><tr><th>物件</th><th>期</th><th>エリア</th><th>直近の工程</th><th>経過</th><th>営業</th><th>意匠設計</th><th>確認設計</th><th>IC</th><th>工事</th></tr></thead>
       <tbody id="tbody"></tbody>
     </table>
   </div>
@@ -226,19 +243,33 @@ footer{font-size:12px;color:var(--muted);border-top:1px solid var(--rule);paddin
 </div>
 
 <script>
-const SECRET = {"s": "f/1kKyzoiFex0DiaUDT+tg==", "i": "JrMIJp5e13bIhZvE", "c": "b2h/oewXhwGl44038LZPd4X9kESGf3JyzJXab7Xx6yvPLRr9Khi2fWSr1TfOE0PWYm9VAWYItqML42vma0gXOr7bknXB7FJxFku5/RcBiZeIeTp2v9A3FI3FICmQd0Rqd67Dm2ct1wzBvAzTx+0BeBMvPp0cEVE="};
-const MIL = ['設計申込','ヒアリング','プラン確定','請負契約','IC初回','IC完了','三者打合','確認申請','着工','上棟','竣工','引渡し'];
+const SECRET = {"s": "PYN6q8j//eUHJsICIiEgOQ==", "i": "jRSOmKxi0HqY58lI", "c": "3qp6cCRCCXglsfzC1Q5bgIr0ZmmffHE8CmlwAlyjMBIGvj74Xdfav9XqpKeBg7U9d5RFjxPJJ5bKn3mERML6IBHlHLMhKabxbmKibMfE5MV9u/OSt83t07G6UNl40n79pi/bnT3iWDTXxdCjkxJ3M+1ObbeWfvvBEn++PgWZw8bzcLM="};
+const MIL = ['設計申込','ヒアリング','敷地調査','プラン確定','プラン最終決定','土地契約','詳細図作成','請負契約',
+ 'IC初回','配線打合','IC完了','決定仕様書完了','社内三者打合','三者打合','確認申請','確認済証','土地決済',
+ '地鎮祭','着工','基礎完了','上棟','外壁工事完了','造作工事完了','内装工事完了','社内検査','完了検査','竣工',
+ '施主内覧','引渡し','最終清算書'];
 const COL = {
-  '設計申込':['設計申込予定日','設計申込実施日'], 'ヒアリング':['ヒアリング予定日','ヒアリング実施日'],
-  'プラン確定':['プラン確定予定日','プラン確定実施日'], '請負契約':['請負契約予定日','請負契約実施日'],
-  'IC初回':['ＩＣ初回予定日','ＩＣ初回実施日'], 'IC完了':['ＩＣ完了予定日','ＩＣ完了実施日'],
-  '三者打合':['3者打合予定日','３者打合実施日'], '確認申請':['確認申請予定日','確認申請実施日'],
-  '着工':['着工予定日','着工実施日'], '上棟':['上棟予定日','上棟実施日'],
-  '竣工':['建物竣工予定日','建物竣工実施日'], '引渡し':['引渡し予定日','引渡し実施日'],
+ '設計申込':['設計申込予定日','設計申込実施日'], 'ヒアリング':['ヒアリング予定日','ヒアリング実施日'],
+ '敷地調査':['敷地調査予定日','敷地調査実施日'], 'プラン確定':['プラン確定予定日','プラン確定実施日'],
+ 'プラン最終決定':['プラン最終決定予定日','プラン最終決定実施日'], '土地契約':['土地契約予定日','土地契約実施日'],
+ '詳細図作成':['詳細図作成予定日','詳細図作成実施日'], '請負契約':['請負契約予定日','請負契約実施日'],
+ 'IC初回':['ＩＣ初回予定日','ＩＣ初回実施日'], '配線打合':['配線打合予定日','配線打合実施日'],
+ 'IC完了':['ＩＣ完了予定日','ＩＣ完了実施日'], '決定仕様書完了':['決定仕様書完了予定日','決定仕様書完了実施日'],
+ '社内三者打合':['社内3者打合予定日','社内３者打合実施日'], '三者打合':['3者打合予定日','３者打合実施日'],
+ '確認申請':['確認申請予定日','確認申請実施日'], '確認済証':['確認済証予定日','確認済証実施日'],
+ '土地決済':['土地決済予定日','土地決済実施日'], '地鎮祭':['地鎮祭予定日','地鎮祭実施日'],
+ '着工':['着工予定日','着工実施日'], '基礎完了':['基礎完了予定日','基礎完了実施日'],
+ '上棟':['上棟予定日','上棟実施日'], '外壁工事完了':['外壁工事完了予定日','外壁工事完了実施日'],
+ '造作工事完了':['造作工事完了予定日','造作工事完了実施日'], '内装工事完了':['内装工事完了予定日','内装工事完了実施日'],
+ '社内検査':['社内検査予定日','社内検査実施日'], '完了検査':['完了検査予定日','完了検査実施日'],
+ '竣工':['建物竣工予定日','建物竣工実施日'], '施主内覧':['施主内覧予定日','施主内覧実施日'],
+ '引渡し':['引渡し予定日','引渡し実施日'], '最終清算書':['最終清算書予定日','最終清算書実施日']
 };
 let P = [], GEN = '';
 
-/* ---------- 合言葉と読み込み ---------- */
+const C = {営業:'var(--sales)', 意匠設計:'var(--design)', 確認設計:'var(--design2)',
+  'IC待ち':'var(--icwait)', IC:'var(--ic)', 工事:'var(--const)', 引渡:'var(--hand)'};
+
 const b64 = s => Uint8Array.from(atob(s), c=>c.charCodeAt(0));
 async function unlock(pass){
   const enc = new TextEncoder();
@@ -275,8 +306,7 @@ function toISO(s){
 
 function build(rows){
   const head = rows[0].map(h=>h.replace(/[\r\n]/g,'').trim());
-  const ix = n => head.indexOf(n);
-  const g = (r,n) => { const i=ix(n); return i<0 ? '' : (r[i]||'').trim(); };
+  const g = (r,n) => { const i=head.indexOf(n); return i<0 ? '' : (r[i]||'').trim(); };
   const out=[];
   for(let k=1;k<rows.length;k++){
     const r=rows[k];
@@ -284,8 +314,8 @@ function build(rows){
     let ki=g(r,'竣工予定'); if(ki==='失注') continue;
     if(ki==='設計申込'||!ki) ki='期未定';
     const o={名前:name, 期:ki, エリア:g(r,'打合せ場所')||'未設定', 種別:g(r,'商品種別')||'未設定',
-      営業:g(r,'営業担当')||'未設定', 設計:g(r,'設計担当')||'未設定',
-      IC:g(r,'I C担当')||'未設定', 工事:g(r,'工事担当')||'未設定'};
+      営業:g(r,'営業担当')||'未設定', 意匠設計:g(r,'意匠設計担当')||'未設定',
+      確認設計:g(r,'確認設計担当')||'未設定', IC:g(r,'I C担当')||'未設定', 工事:g(r,'工事担当')||'未設定'};
     MIL.forEach(m=>{ o['p_'+m]=toISO(g(r,COL[m][0])); o['a_'+m]=toISO(g(r,COL[m][1])); });
     out.push(o);
   }
@@ -317,9 +347,6 @@ async function start(){
 document.getElementById('unlock').onclick=start;
 document.getElementById('pw').onkeydown=e=>{ if(e.key==='Enter') start(); };
 
-const C = {営業:'var(--sales)', 設計:'var(--design)', IC:'var(--ic)', 工事:'var(--const)', 引渡:'var(--hand)'};
-
-/* ---------- helpers ---------- */
 const d = s => s ? new Date(s+'T00:00:00') : null;
 const days = (a,b) => { const x=d(a), y=d(b); if(!x||!y) return null;
   const n = Math.round((y-x)/86400000); return (n<0 || n>760) ? null : n; };
@@ -329,14 +356,20 @@ const mean = a => a.length ? a.reduce((s,v)=>s+v,0)/a.length : null;
 const med  = a => { if(!a.length) return null; const s=[...a].sort((x,y)=>x-y), h=s.length>>1;
   return s.length%2 ? s[h] : (s[h-1]+s[h])/2; };
 const r0 = v => v===null ? '–' : Math.round(v).toLocaleString('ja-JP');
+const isDone = p => p['a_引渡し'] || p['a_最終清算書'];
+const isSettled = p => !!p['a_最終清算書'];
+const lastPhase = p => { let l=null; MIL.forEach(m=>{ if(p['a_'+m]) l=m; }); return l; };
+const DONEBY = { 意匠設計:{m:'プラン確定', label:'プラン確定の実施日'} };
+const roleDone = (role,p) => DONEBY[role] ? !!p['a_'+DONEBY[role].m] : isSettled(p);
 
-/* 区間定義 */
 const SEG = [
   {name:'設計申込 → 請負契約', who:'営業', from:'設計申込', to:'請負契約', role:'営業',
    desc:'設計申込をいただいてから、土地とプランを固めて請負契約を結ぶまで'},
-  {name:'請負契約 → IC完了', who:'IC', from:'請負契約', to:'IC完了', role:'IC',
-   desc:'契約後、内装・設備の仕様をお客様と打ち合わせて決めきるまで'},
-  {name:'IC完了 → 着工', who:'設計・工務', from:'IC完了', to:'着工', role:'設計',
+  {name:'請負契約 → IC初回', who:'IC', from:'請負契約', to:'IC初回', role:'IC待ち',
+   desc:'契約のあと、インテリアコーディネーターとの打合せが始まるまでの待ち時間'},
+  {name:'IC初回 → IC完了', who:'IC', from:'IC初回', to:'IC完了', role:'IC',
+   desc:'内装・設備の仕様をお客様と打ち合わせて、決めきるまで'},
+  {name:'IC完了 → 着工', who:'確認設計・工務', from:'IC完了', to:'着工', role:'確認設計',
    desc:'仕様が固まってから、確認申請や着工準備を終えて現場に入るまで'},
   {name:'着工 → 竣工', who:'工事', from:'着工', to:'竣工', role:'工事',
    desc:'基礎から上棟、内外装まで、建物が完成するまでの工事期間'},
@@ -348,34 +381,53 @@ const METRICS = {
   営業:[
     {t:'設計申込 → 請負契約', f:'設計申込', o:'請負契約'},
     {t:'設計申込 → ヒアリング', f:'設計申込', o:'ヒアリング'},
-    {t:'ヒアリング → 請負契約', f:'ヒアリング', o:'請負契約'},
+    {t:'設計申込 → 土地契約', f:'設計申込', o:'土地契約'},
+    {t:'土地契約 → 請負契約', f:'土地契約', o:'請負契約'},
+    {t:'請負契約 → 土地決済', f:'請負契約', o:'土地決済'},
+    {t:'請負契約の遅れ（予定比）', delay:'請負契約'},
   ],
-  設計:[
+  意匠設計:[
     {t:'ヒアリング → プラン確定', f:'ヒアリング', o:'プラン確定'},
-    {t:'プラン確定 → 確認申請', f:'プラン確定', o:'確認申請'},
-    {t:'請負契約 → 着工', f:'請負契約', o:'着工'},
+    {t:'プラン確定 → プラン最終決定', f:'プラン確定', o:'プラン最終決定'},
+    {t:'ヒアリング → プラン最終決定', f:'ヒアリング', o:'プラン最終決定'},
+    {t:'敷地調査 → プラン最終決定', f:'敷地調査', o:'プラン最終決定'},
+    {t:'設計申込 → プラン最終決定', f:'設計申込', o:'プラン最終決定'},
+  ],
+  確認設計:[
+    {t:'プラン最終決定 → 確認申請', f:'プラン最終決定', o:'確認申請'},
+    {t:'確認申請 → 確認済証', f:'確認申請', o:'確認済証'},
+    {t:'確認済証 → 着工', f:'確認済証', o:'着工'},
+    {t:'確認申請 → 着工', f:'確認申請', o:'着工'},
+    {t:'請負契約 → 確認申請', f:'請負契約', o:'確認申請'},
+    {t:'プラン最終決定 → 着工', f:'プラン最終決定', o:'着工'},
   ],
   IC:[
     {t:'IC初回 → IC完了', f:'IC初回', o:'IC完了'},
     {t:'請負契約 → IC初回', f:'請負契約', o:'IC初回'},
     {t:'請負契約 → IC完了', f:'請負契約', o:'IC完了'},
+    {t:'IC初回 → 配線打合', f:'IC初回', o:'配線打合'},
+    {t:'IC完了 → 決定仕様書完了', f:'IC完了', o:'決定仕様書完了'},
+    {t:'IC完了 → 三者打合', f:'IC完了', o:'三者打合'},
+    {t:'IC完了の遅れ（予定比）', delay:'IC完了'},
   ],
   工事:[
     {t:'着工 → 竣工', f:'着工', o:'竣工'},
-    {t:'着工 → 上棟', f:'着工', o:'上棟'},
-    {t:'上棟 → 竣工', f:'上棟', o:'竣工'},
+    {t:'着工 → 基礎完了', f:'着工', o:'基礎完了'},
+    {t:'基礎完了 → 上棟', f:'基礎完了', o:'上棟'},
+    {t:'上棟 → 外壁工事完了', f:'上棟', o:'外壁工事完了'},
+    {t:'上棟 → 造作工事完了', f:'上棟', o:'造作工事完了'},
+    {t:'内装工事完了 → 竣工', f:'内装工事完了', o:'竣工'},
     {t:'竣工 → 引渡し', f:'竣工', o:'引渡し'},
     {t:'着工の遅れ（予定比）', delay:'着工'},
     {t:'竣工の遅れ（予定比）', delay:'竣工'},
   ],
 };
 
-/* ---------- filters ---------- */
-const uniq = k => [...new Set(P.map(p=>p[k]))].sort((a,b)=>a.localeCompare(b,'ja'));
 const ALL='__ALL__';
-const state = {期:ALL, エリア:ALL, 種別:ALL, tab:{}, open:{}};
+const state = {期:ALL, エリア:ALL, 種別:ALL, tab:{}, open:{}, openLoad:{}};
 Object.keys(METRICS).forEach(k=>{state.tab[k]=0; state.open[k]=null;});
 
+const uniq = k => [...new Set(P.map(p=>p[k]))].sort((a,b)=>a.localeCompare(b,'ja'));
 function chips(hostId, key){
   const sel=document.getElementById(hostId);
   const opts = [[ALL,'すべて']].concat(uniq(key).map(v=>[v, `${v}（${P.filter(p=>p[key]===v).length}）`]));
@@ -385,12 +437,10 @@ function chips(hostId, key){
 const hit = (key,v) => state[key]===ALL || state[key]===v;
 const rows = () => P.filter(p=>hit('期',p.期)&&hit('エリア',p.エリア)&&hit('種別',p.種別));
 
-/* ---------- render ---------- */
 function render(){
   const R = rows();
   document.getElementById('nProj').textContent = R.length;
 
-  /* pipeline */
   const segv = SEG.map(s=>{
     const v = R.map(p=>days(p['a_'+s.from], p['a_'+s.to])).filter(x=>x!==null);
     return {...s, avg:mean(v), n:v.length, med:med(v)};
@@ -418,7 +468,6 @@ function render(){
   document.getElementById('totalN').textContent =
     full.length ? `実績 ${full.length}棟／中央値 ${r0(med(full))}日・最短 ${r0(Math.min(...full))}日・最長 ${r0(Math.max(...full))}日` : 'この条件では引渡し済みの実績がありません';
 
-  /* KPI */
   const kdef=[
     {k:'営業日数',   s:'設計申込 → 請負契約', f:'設計申込', o:'請負契約', c:C.営業},
     {k:'IC日数',     s:'IC初回 → IC完了',     f:'IC初回',   o:'IC完了',   c:C.IC},
@@ -433,7 +482,6 @@ function render(){
       <div class="m">${x.s}｜${v.length}棟・中央値 ${r0(med(v))}日</div></div>`;
   }).join('');
 
-  /* delays */
   const ddef=['請負契約','IC完了','着工','上棟','竣工','引渡し'];
   const dvals = ddef.map(m=>{
     const v=R.map(p=>raw(p['p_'+m],p['a_'+m])).filter(x=>x!==null);
@@ -448,7 +496,40 @@ function render(){
       <div class="m">${x.n}棟中 ${x.late}棟が1週間以上おくれ</div></div>`;
   }).join('');
 
-  /* per-person blocks */
+  const lhost=document.getElementById('loads'); lhost.innerHTML='';
+  Object.keys(METRICS).forEach(role=>{
+    const g={};
+    R.forEach(p=>{ const w=p[role]||'未設定'; (g[w] ||= {A:[],F:[]});
+      (roleDone(role,p) ? g[w].F : g[w].A).push(p); });
+    const list=Object.entries(g).map(([who,v])=>({who, act:v.A.length, fin:v.F.length,
+      n:v.A.length+v.F.length, A:v.A, F:v.F})).sort((a,b)=> b.act-a.act || b.n-a.n);
+    const mx=Math.max(...list.map(x=>x.n),1);
+    const act=list.reduce((s,x)=>s+x.act,0), fin=list.reduce((s,x)=>s+x.fin,0);
+    const el=document.createElement('div'); el.className='lcard';
+    el.innerHTML=`<span class="btag" style="background:${C[role]}">${role}担当</span>
+      <div class="lhead"><span></span><span></span><span>進行中</span><span>完了</span></div>
+      ${list.map(x=>{
+        const open = state.openLoad[role]===x.who;
+        const li = (arr,label) => arr.length ? `<div class="dh">${label}（${arr.length}棟）</div>` +
+          arr.slice().sort((a,b)=>a.名前.localeCompare(b.名前,'ja')).map(p=>
+            `<div class="it"><b>${p.名前}</b><span>${p.期}・${lastPhase(p)||'未着手'}</span></div>`).join('') : '';
+        return `<button class="lrow" data-lr="${role}" data-lw="${x.who}" aria-expanded="${open}">
+        <span class="nm" title="${x.who}">${x.who}</span>
+        <span class="tr"><i style="width:${x.n/mx*100}%;background:${C[role]}"></i>
+          <b style="width:${x.act/mx*100}%;background:${C[role]}"></b></span>
+        <span class="ct"><b>${x.act}</b></span>
+        <span class="ct dim">${x.fin}</span>
+      </button>${open?`<div class="ldetail">${li(x.A,'進行中')}${li(x.F,'完了')}</div>`:''}`;
+      }).join('')}
+      <div class="lfoot">進行中 ${act}棟 ／ 完了 ${fin}棟（合計 ${act+fin}棟）<br>
+        完了＝${DONEBY[role] ? DONEBY[role].label : '最終清算書の実施日'}が入っているもの</div>`;
+    lhost.appendChild(el);
+  });
+  lhost.querySelectorAll('button.lrow').forEach(b=>{
+    b.onclick=()=>{ const r=b.dataset.lr;
+      state.openLoad[r] = state.openLoad[r]===b.dataset.lw ? null : b.dataset.lw; render(); };
+  });
+
   const host=document.getElementById('blocks'); host.innerHTML='';
   Object.keys(METRICS).forEach(role=>{
     const mIdx = state.tab[role], m = METRICS[role][mIdx];
@@ -462,8 +543,7 @@ function render(){
     const list = Object.entries(groups)
       .map(([who,items])=>({who, items:[...items].sort((a,b)=>a.v-b.v),
         avg:mean(items.map(i=>i.v)), n:items.length}))
-      .filter(x=>x.n>0)
-      .sort((a,b)=>a.avg-b.avg);
+      .filter(x=>x.n>0).sort((a,b)=>a.avg-b.avg);
     const all = Object.values(groups).flat().map(i=>i.v);
     const gAvg = mean(all);
     const mx = Math.max(...list.map(x=>x.avg), gAvg||0, 1);
@@ -505,35 +585,34 @@ function render(){
       state.open[r] = state.open[r]===b.dataset.w ? null : b.dataset.w; render(); };
   });
 
-  /* table */
   const today = new Date();
-  const tb = R.map(p=>{
-    let last=null;
-    MIL.forEach(m=>{ if(p['a_'+m]) last=m; });
-    const done = last==='引渡し';
+  const closed = R.filter(isDone).length;
+  const tb = R.filter(p=>!isDone(p)).map(p=>{
+    const last = lastPhase(p);
     const el = last ? Math.round((today - d(p['a_'+last]))/86400000) : null;
-    return {p, last, el, done};
-  }).sort((a,b)=>{
-    if(a.done!==b.done) return a.done?1:-1;
-    return (b.el??-1e9)-(a.el??-1e9);
-  });
-  const roleOf = m => ['設計申込','ヒアリング','プラン確定','請負契約'].includes(m) ? '営業'
-    : ['IC初回','IC完了','三者打合'].includes(m) ? 'IC'
-    : ['確認申請'].includes(m) ? '設計'
-    : m==='引渡し' ? '引渡' : '工事';
+    return {p, last, el};
+  }).sort((a,b)=>(b.el??-1e9)-(a.el??-1e9));
+  const SALES=['設計申込','ヒアリング','土地契約','詳細図作成','請負契約','土地決済'];
+  const ICP=['IC初回','配線打合','IC完了','決定仕様書完了','社内三者打合','三者打合'];
+  const ISH=['敷地調査','プラン確定','プラン最終決定'];
+  const KAK=['確認申請','確認済証'];
+  const roleOf = m => SALES.includes(m) ? '営業' : ICP.includes(m) ? 'IC'
+    : ISH.includes(m) ? '意匠設計' : KAK.includes(m) ? '確認設計'
+    : ['引渡し','施主内覧','最終清算書'].includes(m) ? '引渡' : '工事';
   document.getElementById('tbody').innerHTML = tb.map(x=>`
     <tr>
       <td>${x.p.名前}</td><td>${x.p.期}</td><td>${x.p.エリア}</td>
       <td>${x.last?`<span class="phase" style="background:${C[roleOf(x.last)]}">${x.last}</span>`:'<span style="color:var(--muted)">未着手</span>'}</td>
-      <td class="n">${x.el===null?'–':(x.done?'引渡済':x.el.toLocaleString('ja-JP')+'日')}</td>
-      <td>${x.p.営業}</td><td>${x.p.設計}</td><td>${x.p.IC}</td><td>${x.p.工事}</td>
+      <td class="n">${x.el===null?'–':x.el.toLocaleString('ja-JP')+'日'}</td>
+      <td>${x.p.営業}</td><td>${x.p.意匠設計}</td><td>${x.p.確認設計}</td><td>${x.p.IC}</td><td>${x.p.工事}</td>
     </tr>`).join('');
+  document.getElementById('tnote').textContent = closed
+    ? `引渡しが済んだ ${closed}棟 は除いています（残り ${tb.length}棟）` : `${tb.length}棟`;
 
   document.getElementById('foot').textContent =
     `出典：Google スプレッドシート「THE HAUS_全体スケジュール」の実施日・予定日／${GEN}に読み込み／` +
-    `マイナスの日数や2年を超える極端な値は入力ミスとみなして集計から除いています。`;
+    `シートにフィルタがかかっていても、常に全件を読み込みます／マイナスの日数や2年を超える極端な値は入力ミスとみなして集計から除いています。`;
 }
-
 </script>
 </body>
 </html>

@@ -103,6 +103,12 @@ tr.total td{font-weight:650; border-top:2px solid var(--axis)}
 .bar{position:relative; height:8px; width:88px; background:var(--budget); border-radius:4px; display:inline-block; vertical-align:middle}
 .bar i{position:absolute; inset:0 auto 0 0; border-radius:4px; background:var(--s1); display:block}
 .bar i.over{background:var(--crit)}
+.tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-bottom:16px}
+.tile{background:var(--surface-2); border-radius:10px; padding:12px 14px}
+.tile .tl{font-size:12px; color:var(--ink-2); margin-bottom:4px}
+.tile .tv{font-size:21px; font-weight:700; letter-spacing:-.01em; font-variant-numeric:tabular-nums;
+font-family:"Zen Kaku Gothic New","Noto Sans JP",system-ui,sans-serif}
+.tile .tn{font-size:11.5px; color:var(--muted); margin-top:3px}
 .cell-rate{display:flex; align-items:center; gap:9px; justify-content:flex-end}
 #matrix{min-width:820px}
 #matrix th{text-align:center}
@@ -197,6 +203,13 @@ footer b{color:var(--ink-2)}
 </div>
 </section>
 <section>
+<h2>申込単価（設計申込1件あたりの広告費）</h2>
+<p class="desc">その期間の広告費合計 ÷ 設計申込の件数。1件の設計申込を取るのに広告費がいくらかかったかを表します。</p>
+<div class="tiles" id="mktiles"></div>
+<div class="chart" id="mkchart"></div>
+<div class="tablewrap"><table id="mktable"></table></div>
+</section>
+<section>
 <h2>反響数・来場数（目標 vs 実績）</h2>
 <p class="desc">客単価の分母。件数が伸びないと広告費を使っても単価が悪化します。</p>
 <div class="legend">
@@ -217,7 +230,7 @@ footer b{color:var(--ink-2)}
 ・「消化率」＝ 実績 ÷ 予算。100%超はオーバー（赤表示）。<br>
 ・「直接広告費」＝ ホームページ流入（Google・Meta・Yahoo・チラシ等）。「間接広告費」＝ SEO・ポータル・HP運営・ブランディング費。<br>
 ・先々の月の実績欄には、すでに確定した固定費や発注済みの金額がシートに入力されています。確定実績の月数は上部の表示をご覧ください。<br>
-・設計申込のデータが業績把握シートに未入力のため、申込単価は表示していません（入力されれば追加できます）。
+・「申込単価」＝ その期間の広告費合計 ÷ 設計申込の件数。前期＝5〜10月、後期＝11〜4月です。
 </footer>
 </div>
 </div>
@@ -272,7 +285,8 @@ const PERF_KEYS = [
 ['hankyo_actual','反響','単月合計'],
 ['raijo_target','来場数','単月目標'],['raijo_actual','来場数','単月実績'],
 ['ad_direct','広告宣伝費','直接'],['ad_indirect','広告宣伝費','間接'],
-['cpa_hankyo','費対果','反響単価（資請+来予）'],['cpa_raijo','費対果','来場単価（新規客']
+['cpa_hankyo','費対果','反響単価（資請+来予）'],['cpa_raijo','費対果','来場単価（新規客'],
+['moshikomi','設計申込','合計']
 ];
 function buildFromCSV(text){
 const R = parseCSV(text);
@@ -327,11 +341,15 @@ const r=findRow(big,small);
 perf[key]= r<0 ? new Array(12).fill(null) : mcols.map(c=>numOf(g(r,c)));
 });
 // 単価はシートの丸め値ではなく、金額÷件数で計算し直す
+perf.ad_total = new Array(12).fill(null);
+perf.cpa_moshikomi = new Array(12).fill(null);
 for(let i=0;i<12;i++){
 const dir=perf.ad_direct[i], ind=perf.ad_indirect[i];
 const tot = (dir==null && ind==null) ? null : (dir||0)+(ind||0);
+perf.ad_total[i] = tot;
 perf.cpa_hankyo[i] = (tot && perf.hankyo_actual[i]) ? tot/perf.hankyo_actual[i] : null;
 perf.cpa_raijo[i]  = (tot && perf.raijo_actual[i])  ? tot/perf.raijo_actual[i]  : null;
+perf.cpa_moshikomi[i] = (tot && perf.moshikomi[i]) ? tot/perf.moshikomi[i] : null;
 }
 const budget_total = numOf(g(0,3)) || monthly.reduce((s,m)=>s+m.budget,0);
 const actual_total = monthly.reduce((s,m)=>s+m.actual,0);
@@ -696,6 +714,70 @@ const p=DATA.perf;
 renderBars('perf1','反響数（資料請求＋来場予約）', p.hankyo_target, p.hankyo_actual, 'var(--s1)');
 renderBars('perf2','来場数（初回接客数）', p.raijo_target, p.raijo_actual, 'var(--s2)');
 }
+const H1=[0,1,2,3,4,5], H2=[6,7,8,9,10,11];
+function mkAgg(idx){
+const p=DATA.perf;
+let ad=0, cnt=0, has=false;
+idx.forEach(i=>{ if(p.ad_total[i]!=null){ ad+=p.ad_total[i]; has=true; } if(p.moshikomi[i]) cnt+=p.moshikomi[i]; });
+return {ad, cnt, unit: (has&&cnt) ? ad/cnt : null, has};
+}
+function renderMoshikomi(){
+const p=DATA.perf;
+const h1=mkAgg(H1), h2=mkAgg(H2), all=mkAgg([...H1,...H2]);
+const tile=(l,a,note)=>`<div class="tile"><div class="tl">${l}</div>
+<div class="tv">${a.unit==null?'—':yen(a.unit)}</div><div class="tn">${note}</div></div>`;
+document.getElementById('mktiles').innerHTML =
+tile('前期（5〜10月）平均', h1, h1.unit==null?'データなし':`広告費 ${yenK(h1.ad)}円 ÷ 申込 ${h1.cnt}件`) +
+tile('後期（11〜4月）平均', h2, h2.unit==null?'まだ実績なし':`広告費 ${yenK(h2.ad)}円 ÷ 申込 ${h2.cnt}件`) +
+tile('通期 合計', all, all.unit==null?'データなし':`広告費 ${yenK(all.ad)}円 ÷ 申込 ${all.cnt}件`);
+// chart
+const host=document.getElementById('mkchart'); host.innerHTML='';
+const vals=p.cpa_moshikomi;
+const nShow=Math.max(1, vals.reduce((n,v,i)=>v!=null?i+1:n,0));
+const W=host.clientWidth||800, H=250, P={t:22,r:12,b:34,l:62};
+const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,height:H},host);
+const tip=mkTip(host);
+const max=niceMax(Math.max(...vals.filter(v=>v!=null), all.unit||0));
+const iw=W-P.l-P.r, ih=H-P.t-P.b, step=iw/nShow, bw=Math.min(34,step-18);
+const yS=v=>P.t+ih-(v/max)*ih;
+for(let i=0;i<=4;i++){const v=max*i/4,y=yS(v);
+el('line',{x1:P.l,y1:y,x2:W-P.r,y2:y,stroke:i?'var(--grid)':'var(--axis)'},svg);
+txt(svg,P.l-8,y+4,yenK(v),{'text-anchor':'end'});}
+if(all.unit!=null){
+const y=yS(all.unit);
+el('line',{x1:P.l,y1:y,x2:W-P.r,y2:y,stroke:'var(--ink-2)','stroke-width':1.5,'stroke-dasharray':'3 4',opacity:.65},svg);
+txt(svg,P.l+6,y-6,`通期平均 ${yenK(all.unit)}`,{'text-anchor':'start',fill:'var(--ink-2)','font-size':11});
+}
+for(let i=0;i<nShow;i++){
+const cx=P.l+step*i+step/2, v=vals[i];
+txt(svg,cx,H-14,M[i],{'text-anchor':'middle','font-size':11.5});
+if(v==null){ txt(svg,cx,P.t+ih-8,'—',{'text-anchor':'middle','font-size':12}); continue; }
+const h=Math.max(2,(v/max)*ih);
+el('rect',{x:cx-bw/2,y:P.t+ih-h,width:bw,height:h,rx:4,
+fill: (all.unit!=null && v>all.unit) ? 'var(--s2)' : 'var(--s1)'},svg);
+txt(svg,cx,P.t+ih-h-7,yenK(v),{'text-anchor':'middle','font-size':11,'font-weight':650,
+fill:(all.unit!=null && v>all.unit)?'var(--s2)':'var(--ink)'});
+const hit=el('rect',{x:cx-step/2,y:P.t,width:step,height:ih,fill:'transparent'},svg);
+hit.addEventListener('mousemove',e=>{const b=host.getBoundingClientRect();
+tip.show(`<b>${M[i]}</b>
+<div class="row"><span>広告費 合計</span><span>${yen(p.ad_total[i])}</span></div>
+<div class="row"><span>設計申込</span><span>${p.moshikomi[i]||0} 件</span></div>
+<div class="row"><span>申込単価</span><span>${yen(v)}</span></div>`,
+e.clientX-b.left,e.clientY-b.top);});
+hit.addEventListener('mouseleave',()=>tip.hide());
+}
+// table
+let html='<thead><tr><th>期間</th><th>広告費 合計</th><th>設計申込</th><th>申込単価</th></tr></thead><tbody>';
+for(let i=0;i<nShow;i++){
+html+=`<tr><td>${M[i]}</td><td>${p.ad_total[i]==null?'—':yen(p.ad_total[i])}</td>
+<td>${p.moshikomi[i]||0} 件</td>
+<td>${vals[i]==null?'—':yen(vals[i])}</td></tr>`;
+}
+const row=(l,a)=>`<tr class="total"><td>${l}</td><td>${a.has?yen(a.ad):'—'}</td>
+<td>${a.cnt} 件</td><td>${a.unit==null?'—':yen(a.unit)}</td></tr>`;
+html+=row('前期（5〜10月）',h1)+row('後期（11〜4月）',h2)+row('通期 合計',all);
+document.getElementById('mktable').innerHTML=html+'</tbody>';
+}
 function renderItems(){
 const groups={};
 DATA.items.forEach(it=>{
@@ -724,7 +806,7 @@ html+=`<tr class="total"><td>合計（明細計上分）</td><td>${yen(TB)}</td>
 document.getElementById('items').innerHTML=html+'</tbody>';
 }
 function renderAll(){ if(!DATA) return; recalcAgg(); renderCards(); renderGauge(); renderMonthly(); renderCum();
-renderCat(); renderMRate(); renderMatrix(); renderCPA(); renderPerf(); renderItems(); }
+renderCat(); renderMRate(); renderMatrix(); renderCPA(); renderMoshikomi(); renderPerf(); renderItems(); }
 function setStatus(kind, msg){
 const el=document.getElementById('status');
 el.className='status '+kind; el.textContent=msg;

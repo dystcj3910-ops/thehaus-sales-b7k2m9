@@ -243,9 +243,9 @@ footer{font-size:12px;color:var(--muted);border-top:1px solid var(--rule);paddin
 </div>
 
 <script>
-const SECRET = {"s": "PYN6q8j//eUHJsICIiEgOQ==", "i": "jRSOmKxi0HqY58lI", "c": "3qp6cCRCCXglsfzC1Q5bgIr0ZmmffHE8CmlwAlyjMBIGvj74Xdfav9XqpKeBg7U9d5RFjxPJJ5bKn3mERML6IBHlHLMhKabxbmKibMfE5MV9u/OSt83t07G6UNl40n79pi/bnT3iWDTXxdCjkxJ3M+1ObbeWfvvBEn++PgWZw8bzcLM="};
+const SECRET = {"s": "7hbkFdwRN0BzB0On3iDVug==", "i": "9pMUMgFQ8/kQ4ESe", "c": "EjPnWTFGogCAn8NpqOrzJnTJoOeT47vrxRejyAsXDHXaLEZ7rpurz0ta9qagZNL0X0Ebh+Vs+aBTdxpddsKQvS7cnkpUx9FTY1dAONwylWaIdR5I4EuVMWBPCh7Sec4RF2VxDIM+WQonqEh6aKpgJC8vt8z3es0oLzQphy0MVbZm4eA="};
 const MIL = ['設計申込','ヒアリング','敷地調査','プラン確定','プラン最終決定','土地契約','詳細図作成','請負契約',
- 'IC初回','配線打合','IC完了','決定仕様書完了','社内三者打合','三者打合','確認申請','確認済証','土地決済',
+ 'IC初回','配線打合','IC完了','決定仕様書完了','社内三者打合','三者打合','確認申請依頼','確認申請','確認済証','土地決済',
  '地鎮祭','着工','基礎完了','上棟','外壁工事完了','造作工事完了','内装工事完了','社内検査','完了検査','竣工',
  '施主内覧','引渡し','最終清算書'];
 const COL = {
@@ -256,6 +256,7 @@ const COL = {
  'IC初回':['ＩＣ初回予定日','ＩＣ初回実施日'], '配線打合':['配線打合予定日','配線打合実施日'],
  'IC完了':['ＩＣ完了予定日','ＩＣ完了実施日'], '決定仕様書完了':['決定仕様書完了予定日','決定仕様書完了実施日'],
  '社内三者打合':['社内3者打合予定日','社内３者打合実施日'], '三者打合':['3者打合予定日','３者打合実施日'],
+ '確認申請依頼':['確認申請依頼予定日','確認申請依頼実施日'],
  '確認申請':['確認申請予定日','確認申請実施日'], '確認済証':['確認済証予定日','確認済証実施日'],
  '土地決済':['土地決済予定日','土地決済実施日'], '地鎮祭':['地鎮祭予定日','地鎮祭実施日'],
  '着工':['着工予定日','着工実施日'], '基礎完了':['基礎完了予定日','基礎完了実施日'],
@@ -394,6 +395,8 @@ const METRICS = {
     {t:'設計申込 → プラン最終決定', f:'設計申込', o:'プラン最終決定'},
   ],
   確認設計:[
+    {t:'プラン最終決定 → 確認申請依頼', f:'プラン最終決定', o:'確認申請依頼'},
+    {t:'確認申請依頼 → 確認申請', f:'確認申請依頼', o:'確認申請'},
     {t:'プラン最終決定 → 確認申請', f:'プラン最終決定', o:'確認申請'},
     {t:'確認申請 → 確認済証', f:'確認申請', o:'確認済証'},
     {t:'確認済証 → 着工', f:'確認済証', o:'着工'},
@@ -595,7 +598,7 @@ function render(){
   const SALES=['設計申込','ヒアリング','土地契約','詳細図作成','請負契約','土地決済'];
   const ICP=['IC初回','配線打合','IC完了','決定仕様書完了','社内三者打合','三者打合'];
   const ISH=['敷地調査','プラン確定','プラン最終決定'];
-  const KAK=['確認申請','確認済証'];
+  const KAK=['確認申請依頼','確認申請','確認済証'];
   const roleOf = m => SALES.includes(m) ? '営業' : ICP.includes(m) ? 'IC'
     : ISH.includes(m) ? '意匠設計' : KAK.includes(m) ? '確認設計'
     : ['引渡し','施主内覧','最終清算書'].includes(m) ? '引渡' : '工事';

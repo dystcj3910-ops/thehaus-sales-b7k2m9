@@ -122,8 +122,8 @@ footer b{color:var(--ink-2)}
 <div class="wrap">
 <header>
 <h1>広告費ダッシュボード</h1>
-<p class="sub">THE HAUS ／ 第18期（2026年5月〜2027年4月）</p>
-<p class="meta">出典：「THEHAUS様_業績管理」の<b>26/27広告宣伝費</b>・<b>25/26業績把握</b>シート（連携シート経由で自動取得）</p>
+<p class="sub" id="sub">THE HAUS</p>
+<p class="meta">出典：「THEHAUS様_業績管理」の<b>26/27広告宣伝費</b>・<b>25/26業績把握</b>／「建築営業帳票」（連携シート経由で自動取得）</p>
 <div class="statusrow" id="statusrow" hidden>
 <span class="status loading" id="status">読み込み中…</span>
 <button class="reload" id="reload" type="button">最新に更新</button>
@@ -210,6 +210,14 @@ footer b{color:var(--ink-2)}
 <div class="tablewrap"><table id="mktable"></table></div>
 </section>
 <section>
+<h2>受注（請負契約）のきっかけ媒体</h2>
+<p class="desc" id="mediadesc"></p>
+<div class="tiles" id="mdtiles"></div>
+<div class="chart" id="mdchart"></div>
+<div class="tablewrap"><table id="mdtable"></table></div>
+<p class="desc" id="mdnote" style="margin:12px 0 0"></p>
+</section>
+<section>
 <h2>反響数・来場数（目標 vs 実績）</h2>
 <p class="desc">客単価の分母。件数が伸びないと広告費を使っても単価が悪化します。</p>
 <div class="legend">
@@ -230,7 +238,8 @@ footer b{color:var(--ink-2)}
 ・「消化率」＝ 実績 ÷ 予算。100%超はオーバー（赤表示）。<br>
 ・「直接広告費」＝ ホームページ流入（Google・Meta・Yahoo・チラシ等）。「間接広告費」＝ SEO・ポータル・HP運営・ブランディング費。<br>
 ・先々の月の実績欄には、すでに確定した固定費や発注済みの金額がシートに入力されています。確定実績の月数は上部の表示をご覧ください。<br>
-・「申込単価」＝ その期間の広告費合計 ÷ 設計申込の件数。前期＝5〜10月、後期＝11〜4月です。
+・「申込単価」＝ その期間の広告費合計 ÷ 設計申込の件数。前期＝5〜10月、後期＝11〜4月です。<br>
+・「きっかけ媒体」は別シート「建築営業帳票」から取得しています（顧客名などの個人情報は取り込んでいません）。
 </footer>
 </div>
 </div>
@@ -351,9 +360,23 @@ perf.cpa_hankyo[i] = (tot && perf.hankyo_actual[i]) ? tot/perf.hankyo_actual[i] 
 perf.cpa_raijo[i]  = (tot && perf.raijo_actual[i])  ? tot/perf.raijo_actual[i]  : null;
 perf.cpa_moshikomi[i] = (tot && perf.moshikomi[i]) ? tot/perf.moshikomi[i] : null;
 }
+// 建築営業帳票ブロック（A100 以降）: 媒体 / 設計申込日 / 請負契約日 / 追客状況
+const pd = v => {
+const t=CLEAN(v); if(!t) return null;
+const m=t.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+if(!m) return null;
+const d=new Date(+m[1], +m[2]-1, +m[3]);
+return isNaN(d) ? null : d;
+};
+const contracts=[];
+for(let r=95;r<R.length;r++){
+const media=CLEAN(g(r,0)), c=pd(g(r,2));
+if(!c) continue;
+contracts.push({media: media||'未入力', apply: pd(g(r,1)), contract: c, status: CLEAN(g(r,3))});
+}
 const budget_total = numOf(g(0,3)) || monthly.reduce((s,m)=>s+m.budget,0);
 const actual_total = monthly.reduce((s,m)=>s+m.actual,0);
-return {months:META.months, monthly, items, cat_total, perf,
+return {months:META.months, monthly, items, cat_total, perf, contracts,
 head:{budget_total, actual_total,
 web_budget:cat_total['ホームページ流入'].budget, web_actual:cat_total['ホームページ流入'].actual}};
 }
@@ -778,6 +801,69 @@ const row=(l,a)=>`<tr class="total"><td>${l}</td><td>${a.has?yen(a.ad):'—'}</t
 html+=row('前期（5〜10月）',h1)+row('後期（11〜4月）',h2)+row('通期 合計',all);
 document.getElementById('mktable').innerHTML=html+'</tbody>';
 }
+const NONPAID = ['紹介','近所','施主','OB'];
+const isPaid = m => !NONPAID.some(k=>m.includes(k));
+function fyOf(d){ const y=d.getFullYear(); return d.getMonth()+1>=5 ? y : y-1; }
+function fyLabel(y){ return '第'+(18+(y-2026))+'期'; }
+function renderMedia(){
+const cs = DATA.contracts || [];
+const curFy = fyOf(new Date());
+const cur = cs.filter(c=>fyOf(c.contract)===curFy);
+const tally = list => {
+const m={}; list.forEach(c=>{ m[c.media]=(m[c.media]||0)+1; });
+return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+};
+const curT = tally(cur), allT = tally(cs);
+const allMap = Object.fromEntries(allT);
+const paid = cur.filter(c=>isPaid(c.media)).length;
+document.getElementById('mediadesc').textContent =
+`建築営業帳票の「きっかけ媒体」を、請負契約日が入った日で数えています（${fyLabel(curFy)}＝${curFy}年5月〜${curFy+1}年4月）。`;
+const tile=(l,v,n)=>`<div class="tile"><div class="tl">${l}</div><div class="tv">${v}</div><div class="tn">${n}</div></div>`;
+document.getElementById('mdtiles').innerHTML =
+tile(`${fyLabel(curFy)}の請負契約`, cur.length+' 件', `全期間 ${cs.length} 件`) +
+tile('うち 広告経由', paid+' 件', cur.length?`${pct(paid/cur.length)}`:'—') +
+tile('うち 紹介・近所', (cur.length-paid)+' 件', cur.length?`${pct((cur.length-paid)/cur.length)}（広告費がかかっていない流入）`:'—');
+// horizontal bars (今期)
+const host=document.getElementById('mdchart'); host.innerHTML='';
+if(!curT.length){ host.innerHTML='<p class="desc">この期の請負契約はまだありません。</p>'; }
+else {
+const W=host.clientWidth||800, narrow=W<560, rowH=narrow?52:38;
+const H=curT.length*rowH+16, P={l:narrow?0:132, r:narrow?64:84};
+const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,height:H},host);
+const tip=mkTip(host);
+const max=curT[0][1], iw=W-P.l-P.r;
+curT.forEach(([name,n],i)=>{
+const y=8+i*rowH, paidOne=isPaid(name);
+if(narrow) txt(svg,0,y+10,name,{'text-anchor':'start',fill:'var(--ink)','font-size':12.5});
+else txt(svg,P.l-10,y+19,name,{'text-anchor':'end',fill:'var(--ink)','font-size':12.5});
+const top = narrow ? y+16 : y+10;
+el('rect',{x:P.l,y:top,width:Math.max(3,iw*n/max),height:14,rx:4,
+fill: paidOne?'var(--s1)':'var(--s3)'},svg);
+txt(svg,W,top+12,`${n} 件`,{'text-anchor':'end',fill:'var(--ink)','font-size':12.5,'font-weight':650});
+const hit=el('rect',{x:0,y,width:W,height:rowH,fill:'transparent'},svg);
+hit.addEventListener('mousemove',e=>{const b=host.getBoundingClientRect();
+tip.show(`<b>${name}</b>
+<div class="row"><span>${fyLabel(curFy)}</span><span>${n} 件（${pct(n/cur.length)}）</span></div>
+<div class="row"><span>全期間</span><span>${allMap[name]||0} 件</span></div>
+<div class="row"><span>区分</span><span>${paidOne?'広告経由':'紹介・近所'}</span></div>`,
+e.clientX-b.left,e.clientY-b.top);});
+hit.addEventListener('mouseleave',()=>tip.hide());
+});
+}
+// table
+let html=`<thead><tr><th>きっかけ媒体</th><th>${fyLabel(curFy)} 件数</th><th>構成比</th><th>全期間 件数</th><th>区分</th></tr></thead><tbody>`;
+const seen=new Set();
+curT.forEach(([name,n])=>{ seen.add(name);
+html+=`<tr><td>${name}</td><td>${n}</td><td>${pct(n/cur.length)}</td><td>${allMap[name]||0}</td>
+<td style="text-align:right;color:${isPaid(name)?'var(--s1)':'var(--s3)'}">${isPaid(name)?'広告経由':'紹介・近所'}</td></tr>`;});
+allT.filter(([n])=>!seen.has(n)).forEach(([name,n])=>{
+html+=`<tr style="opacity:.6"><td>${name}</td><td>0</td><td>—</td><td>${n}</td>
+<td style="text-align:right">${isPaid(name)?'広告経由':'紹介・近所'}</td></tr>`;});
+html+=`<tr class="total"><td>合計</td><td>${cur.length}</td><td>100.0%</td><td>${cs.length}</td><td></td></tr>`;
+document.getElementById('mdtable').innerHTML=html+'</tbody>';
+document.getElementById('mdnote').innerHTML =
+`※ 紹介・近所は広告費をかけずに来ている流入です。広告の費用対効果を見るときは、上の「申込単価」から紹介・近所の分を差し引いて考えると実態に近づきます（${fyLabel(curFy)}は契約 ${cur.length} 件のうち ${cur.length-paid} 件）。`;
+}
 function renderItems(){
 const groups={};
 DATA.items.forEach(it=>{
@@ -806,7 +892,7 @@ html+=`<tr class="total"><td>合計（明細計上分）</td><td>${yen(TB)}</td>
 document.getElementById('items').innerHTML=html+'</tbody>';
 }
 function renderAll(){ if(!DATA) return; recalcAgg(); renderCards(); renderGauge(); renderMonthly(); renderCum();
-renderCat(); renderMRate(); renderMatrix(); renderCPA(); renderMoshikomi(); renderPerf(); renderItems(); }
+renderCat(); renderMRate(); renderMatrix(); renderCPA(); renderMoshikomi(); renderMedia(); renderPerf(); renderItems(); }
 function setStatus(kind, msg){
 const el=document.getElementById('status');
 el.className='status '+kind; el.textContent=msg;
@@ -827,6 +913,8 @@ if(!DATA) document.getElementById('body').style.display='none';
 }
 }
 document.getElementById('reload').onclick = load;
+(function(){ const n=new Date(), y=(n.getMonth()+1>=5)?n.getFullYear():n.getFullYear()-1;
+document.getElementById('sub').textContent=`THE HAUS ／ 第${18+(y-2026)}期（${y}年5月〜${y+1}年4月）`; })();
 const gate=document.getElementById('gate'), gerr=document.getElementById('gateerr');
 async function tryUnlock(pass){
 let url;

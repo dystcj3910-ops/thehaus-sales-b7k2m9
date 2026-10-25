@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Noto+Sans+JP:wght@300;400;500&family=Shippori+Mincho+B1:wght@400;500;600;800&display=swap">
 <style>
   /* 元のシミュレーターのデザインをそのまま使う（ライトテーマ固定） */
-  :root { --bg: #EDEBE5; --fg: #1a1a1a; --muted: #8A7F76; --accent: #7A5F45; color-scheme: light; }
+  :root { --bg: #FFFFFF; --fg: #1a1a1a; --muted: #8A7F76; --accent: #7A5F45; color-scheme: light; }
   body { background: var(--bg); color: var(--fg); font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; overflow-x: hidden; }
   #print-root.app-root { padding-left: max(16px, env(safe-area-inset-left, 0px)) !important; padding-right: max(16px, env(safe-area-inset-right, 0px)) !important; box-sizing: border-box; }
   #loading { text-align: center; padding: 80px 16px; color: var(--muted); font-size: 13px; }
@@ -48,7 +48,7 @@ function PrintButton({ customer = "" }) {
     let atoms = [], totalCss = 0, forced = [];
 
     const canvas = await window.html2canvas(el, {
-      scale: 2, backgroundColor: "#EDEBE5", windowWidth: W, useCORS: true,
+      scale: 2, backgroundColor: "#FFFFFF", windowWidth: W, useCORS: true,
       ignoreElements: n => n.classList && n.classList.contains("no-print"),
       onclone: (doc) => {
         const r = doc.getElementById("print-root");
@@ -124,10 +124,10 @@ function PrintButton({ customer = "" }) {
       const part = document.createElement("canvas");
       part.width = canvas.width; part.height = h;
       const ctx = part.getContext("2d");
-      ctx.fillStyle = "#EDEBE5"; ctx.fillRect(0, 0, part.width, h);
+      ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, part.width, h);
       ctx.drawImage(canvas, 0, y0, canvas.width, h, 0, 0, canvas.width, h);
       if (i > 0) pdf.addPage();
-      pdf.setFillColor(237, 235, 229); pdf.rect(0, 0, pageW, pageH, "F");
+      pdf.setFillColor(255, 255, 255); pdf.rect(0, 0, pageW, pageH, "F");
       const dw = boxW / shrink, dh = Math.min(boxH, h * mmPerPx / shrink);
       const img = part.toDataURL("image/jpeg", 0.92);
       images.push(img);
@@ -991,7 +991,7 @@ function CompareTable({ patterns, income1, income2, otherDebt = 0, burdenRate, a
   });
 
   return (
-    <div style={{ background: "#fff", borderRadius: 20, padding: "22px", boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
+    <div style={{ background: "#fff", borderRadius: 20, padding: "22px", boxShadow: "0 4px 24px rgba(0,0,0,0.07)", border: "1.5px solid #E6DFD5" }}>
       <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: "#2A2018", margin: "0 0 18px", fontWeight: 600, fontFamily: "'Shippori Mincho B1', serif" }}>比較サマリー</h2>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -1080,7 +1080,7 @@ function CompareTable({ patterns, income1, income2, otherDebt = 0, burdenRate, a
 function BorrowerPanel({ income1, setIncome1, income2, setIncome2, otherDebt, setOtherDebt, burdenRate, setBurdenRate, auditRate, setAuditRate }) {
   const total = income1 + income2;
   return (
-    <div style={{ background: "#fff", borderRadius: 20, padding: "22px 26px", boxShadow: "0 4px 24px rgba(0,0,0,0.07)", marginBottom: 18 }}>
+    <div style={{ background: "#fff", borderRadius: 20, padding: "22px 26px", boxShadow: "0 4px 24px rgba(0,0,0,0.07)", border: "1.5px solid #E6DFD5", marginBottom: 18 }}>
       <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: "#2A2018", margin: "0 0 18px", fontWeight: 600, fontFamily: "'Shippori Mincho B1', serif" }}>借りる人の情報</h2>
       <div className="borrower-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: "0 30px" }}>
         <Slider label="主債務者 年収" value={income1} min={0} max={9999} step={1} unit="万円" onChange={setIncome1} format={v => Number.isInteger(v) ? v.toLocaleString("ja-JP") : v.toLocaleString("ja-JP", {maximumFractionDigits: 2})} />
@@ -1128,7 +1128,7 @@ function MortgageApp() {
   const upd = (idx, next) => setPatterns(prev => prev.map((p, i) => i === idx ? next : p));
 
   return (
-    <div id="print-root" className="app-root" style={{ minHeight: "100vh", background: "#EDEBE5", fontFamily: "'Noto Sans JP', sans-serif", display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 14px 80px" }}>
+    <div id="print-root" className="app-root" style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'Noto Sans JP', sans-serif", display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 14px 80px" }}>
       <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Noto+Sans+JP:wght@300;400;500&family=Shippori+Mincho+B1:wght@400;500;600;800&display=swap" rel="stylesheet" />
       <style>{`
         @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}

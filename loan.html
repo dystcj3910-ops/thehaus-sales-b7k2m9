@@ -1,0 +1,1252 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>THE HAUS 住宅ローンシミュレーター</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Noto+Sans+JP:wght@300;400;500&family=Shippori+Mincho+B1:wght@400;500;600;800&display=swap">
+<style>
+  /* 元のシミュレーターのデザインをそのまま使う（ライトテーマ固定） */
+  :root { --bg: #EDEBE5; --fg: #1a1a1a; --muted: #8A7F76; --accent: #7A5F45; color-scheme: light; }
+  body { background: var(--bg); color: var(--fg); font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif; overflow-x: hidden; }
+  #print-root.app-root { padding-left: max(16px, env(safe-area-inset-left, 0px)) !important; padding-right: max(16px, env(safe-area-inset-right, 0px)) !important; box-sizing: border-box; }
+  #loading { text-align: center; padding: 80px 16px; color: var(--muted); font-size: 13px; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body style="margin:0">
+<div id="root"><div id="loading">シミュレーターを読み込んでいます…</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, useRef, useEffect } = React;
+
+// ─── 印刷ボタン（A4横のPDFを作って保存 → 開いて印刷）────────────────────────
+function PrintButton({ customer = "" }) {
+  const dlRef = useRef(null);                   // PDF保存のしくみ（使えない画面では null）
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [pages, setPages] = useState(null);     // PDF保存が使えないときに見せる印刷用画像
+
+  useEffect(() => {
+    dlRef.current = window.claude && window.claude.use
+      ? window.claude.use("downloads").catch(() => null)
+      : Promise.resolve(null);
+  }, []);
+
+  const makePdf = async () => {
+    const el = document.getElementById("print-root");
+    const W = 1040;   // 3パターン横並びを保てる幅
+    const pageW = 210, pageH = 297, margin = 8;
+    const boxW = pageW - margin * 2, boxH = pageH - margin * 2;
+    const pageCss = boxH * W / boxW;           // 縮小せずに1ページに入る高さ（CSS px）
+    let atoms = [], totalCss = 0, forced = [];
+
+    const canvas = await window.html2canvas(el, {
+      scale: 2, backgroundColor: "#EDEBE5", windowWidth: W, useCORS: true,
+      ignoreElements: n => n.classList && n.classList.contains("no-print"),
+      onclone: (doc) => {
+        const r = doc.getElementById("print-root");
+        r.style.width = W + "px"; r.style.minHeight = "0"; r.style.paddingBottom = "24px";
+        r.querySelectorAll(".print-only").forEach(e => { e.style.display = "block"; });
+        r.querySelectorAll(".no-print").forEach(e => { e.style.display = "none"; });
+        // PDFでは「比較サマリー」を1枚目（借りる人の情報の下）に移し、3パターンの詳細は2枚目から
+        const grid = r.querySelector(".pattern-grid");
+        const cmp = grid && grid.nextElementSibling;
+        if (grid && cmp) { grid.parentNode.insertBefore(cmp, grid); cmp.style.marginBottom = "18px"; }
+        const rt = r.getBoundingClientRect().top;
+        totalCss = r.getBoundingClientRect().height;
+        if (grid) forced.push(Math.round(grid.getBoundingClientRect().top - rt - 9));
+        // NISAを開いているときは、NISAの欄から次のページにする
+        const nisa = [...r.querySelectorAll(".nisa-section")].map(e => e.getBoundingClientRect());
+        if (nisa.some(b => b.height > 200)) forced.push(Math.round(Math.min(...nisa.map(b => b.top)) - rt - 2));
+        // 「途中で切ってはいけないまとまり」を集める（大きい箱は中の部品に分けて考える）
+        // 枠や背景のある箱（カード・表など）は800pxまでなら丸ごと1つのまとまりとして扱う
+        const win = doc.defaultView;
+        const isBox = (node) => {
+          const cs = win.getComputedStyle(node);
+          return cs.backgroundImage !== "none" || !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor) || parseFloat(cs.borderTopWidth) > 0;
+        };
+        const collect = (node) => {
+          const rc = node.getBoundingClientRect();
+          if (rc.height < 1) return;
+          const kids = [...node.children].filter(c => c.getBoundingClientRect().height >= 1);
+          const keep = rc.height <= 200 || (rc.height <= 800 && isBox(node) && node !== r);
+          if (!keep && kids.length) kids.forEach(collect);
+          else atoms.push([rc.top - rt, rc.bottom - rt]);
+        };
+        [...r.children].forEach(collect);
+      },
+    });
+
+    // 切ってよい位置 = どの列のまとまりの途中にも当たらない高さ
+    const isFree = (y) => atoms.every(([t, b]) => !(t < y - 0.5 && b > y + 0.5));
+    const cands = [...new Set(atoms.flatMap(([t, b]) => [t, b]).map(v => Math.round(v)))]
+      .filter(isFree).sort((x, y) => x - y);
+
+    const paginate = (ph) => {
+      const cuts = [0];
+      let start = 0;
+      while (true) {
+        const f = forced.find(v => v > start + 1 && v <= start + ph && v < totalCss);
+        if (f !== undefined) { cuts.push(f); start = f; continue; }
+        if (totalCss - start <= ph) break;
+        const limit = start + ph;
+        const ok = cands.filter(c => c > start + ph * 0.35 && c <= limit);
+        const cut = ok.length ? ok[ok.length - 1] : Math.floor(limit);
+        cuts.push(cut); start = cut;
+      }
+      cuts.push(totalCss);
+      return cuts;
+    };
+    // 基本は原寸。少し（最大2割）縮めればページ数が減るときだけ縮める
+    let shrink = 1, cutsCss = paginate(pageCss);
+    for (const sf of [1.08, 1.16, 1.25]) {
+      const c = paginate(pageCss * sf);
+      if (c.length < cutsCss.length) { cutsCss = c; shrink = sf; }
+    }
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const images = [];
+    const k = canvas.width / W;                 // 画像px / CSS px
+    const mmPerPx = boxW / canvas.width;
+    for (let i = 0; i < cutsCss.length - 1; i++) {
+      const y0 = Math.round(cutsCss[i] * k);
+      const y1 = Math.min(canvas.height, Math.round(cutsCss[i + 1] * k));
+      const h = y1 - y0;
+      if (h <= 2) continue;
+      const part = document.createElement("canvas");
+      part.width = canvas.width; part.height = h;
+      const ctx = part.getContext("2d");
+      ctx.fillStyle = "#EDEBE5"; ctx.fillRect(0, 0, part.width, h);
+      ctx.drawImage(canvas, 0, y0, canvas.width, h, 0, 0, canvas.width, h);
+      if (i > 0) pdf.addPage();
+      pdf.setFillColor(237, 235, 229); pdf.rect(0, 0, pageW, pageH, "F");
+      const dw = boxW / shrink, dh = Math.min(boxH, h * mmPerPx / shrink);
+      const img = part.toDataURL("image/jpeg", 0.92);
+      images.push(img);
+      pdf.addImage(img, "JPEG", (pageW - dw) / 2, margin, dw, dh);
+      pdf.setFontSize(8); pdf.setTextColor(160, 150, 140);
+      pdf.text(`${i + 1} / ${cutsCss.length - 1}`, pageW - margin, pageH - 3, { align: "right" });
+    }
+    return { blob: pdf.output("blob"), images };
+  };
+
+  const onClick = async () => {
+    if (busy) return;
+    setBusy(true); setMsg("PDFを作成しています…");
+    let made = null;
+    try {
+      made = await makePdf();
+    } catch (e) {
+      setMsg("PDFを作れませんでした。ページを再読み込みしてからもう一度押してください。");
+      setBusy(false); return;
+    }
+    const d = new Date();
+    const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    const filename = `住宅ローンシミュレーション_${customer.trim() ? customer.trim().replace(/[\\/:*?"<>|]/g, "") + "様_" : ""}${ymd}.pdf`;
+
+    // 普通のWebページ（Claudeの外）で開いているとき：そのままPDFをダウンロード
+    if (!window.claude) {
+      const url = URL.createObjectURL(made.blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      setMsg("PDFを保存しました。ファイルを開いて印刷してください。");
+      setBusy(false); return;
+    }
+
+    const dl = await (dlRef.current || Promise.resolve(null));
+    if (!dl) { setPages(made.images); setMsg(""); setBusy(false); return; }
+    try {
+      await dl.save({ filename, data: made.blob });
+      setMsg("PDFを保存しました。ファイルを開いて印刷してください。");
+    } catch (e) {
+      const code = e && e.code;
+      if (code === "declined") setMsg("保存をキャンセルしました。");
+      else if (code === "rate_limited") setMsg("保存の確認画面がすでに開いています。少し待ってからもう一度押してください。");
+      else { setPages(made.images); setMsg(""); }   // この画面でPDF保存が使えない → 画像で保存してもらう
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="no-print" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+      <button onClick={onClick} disabled={busy}
+        style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 28px", borderRadius: 24, border: "none", background: "linear-gradient(135deg,#B89A72,#7A5F45)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: busy ? "wait" : "pointer", boxShadow: "0 4px 16px rgba(160,120,80,0.35)", opacity: busy ? 0.6 : 1, transition: "opacity 0.2s" }}>
+        <span style={{ fontSize: 18 }}>🖨</span> {busy ? "作成中…" : "このシミュレーション結果を印刷（PDF保存）"}
+      </button>
+      <p style={{ fontSize: 10, color: "#aaa", margin: 0 }}>
+        {msg || "A4縦のPDFを保存します。保存したPDFを開いて印刷してください"}
+      </p>
+
+      {pages && (
+        <div role="dialog" aria-label="印刷用の画像" style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(26,20,14,0.72)", overflowY: "auto", padding: "max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 40px max(16px, env(safe-area-inset-left, 0px))", boxSizing: "border-box" }}>
+          <div style={{ maxWidth: 720, margin: "0 auto", background: "#FAF7F2", borderRadius: 16, padding: "20px 18px 24px", textAlign: "left" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+              <div>
+                <div style={{ fontFamily: "'Shippori Mincho B1', serif", fontSize: 18, fontWeight: 600, color: "#2A2018" }}>印刷用の画像（全{pages.length}枚）</div>
+                <div style={{ fontSize: 12, color: "#6B6158", lineHeight: 1.7, marginTop: 6 }}>
+                  この画面ではPDFを直接保存できないため、A4縦1枚ずつの画像にしました。<br />
+                  <strong>パソコン：</strong>画像を右クリック →「名前を付けて画像を保存」<br />
+                  <strong>スマホ：</strong>画像を長押し →「画像を保存」または「写真に追加」<br />
+                  保存した画像をA4で印刷してください。
+                </div>
+              </div>
+              <button onClick={() => setPages(null)} style={{ flexShrink: 0, padding: "8px 16px", borderRadius: 20, border: "1.5px solid #7A5F45", background: "#fff", color: "#7A5F45", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>閉じる</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {pages.map((src, i) => (
+                <figure key={i} style={{ margin: 0 }}>
+                  <img src={src} alt={`シミュレーション結果 ${i + 1}枚目`} style={{ width: "100%", height: "auto", display: "block", borderRadius: 6, boxShadow: "0 2px 12px rgba(0,0,0,0.15)" }} />
+                  <figcaption style={{ fontSize: 11, color: "#8A7F76", textAlign: "center", marginTop: 6 }}>{i + 1} / {pages.length} 枚目</figcaption>
+                </figure>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const fmt  = (n) => Math.round(n).toLocaleString("ja-JP");
+const fmtM = (n) => (n / 10000).toLocaleString("ja-JP", { maximumFractionDigits: 0 });
+
+const PATTERN_COLORS  = ["#6B5240", "#3D5A46", "#3D4F6B"];
+const PATTERN_BG      = ["#FAF7F2", "#F2F7F4", "#F2F5FA"];
+const PATTERN_BORDER  = ["#DDD0BE", "#B8D0C0", "#B8C4D8"];
+const PATTERN_LABELS  = ["基本", "比較A", "比較B"];
+
+const DEFAULT_PATTERN = {
+  price: 0, priceMode: "amount", desiredMonthly: 0,
+  equityAmountMan: 0,
+  rate: 0, years: 0, type: "equal-payment",
+  bonusEnabled: false, bonusAmountMan: 0,
+  nisaEnabled: false, nisaMonthly: 0, nisaRate: 0, nisaYears: 0, nisaTargetYears: 0,
+};
+
+// 月々支払額・ボーナス払い額から借入元金を逆算
+function calcPrincipalFromMonthly({ monthly, bonusPerTime, rate, years }) {
+  if (years <= 0) return 0;
+  const rm = rate / 100 / 12, months = years * 12;
+  const rb = rate / 100 / 2, nSemi = years * 2;
+  const pMonthly = rm === 0 ? monthly * months : monthly * (1 - Math.pow(1 + rm, -months)) / rm;
+  const pBonus   = bonusPerTime <= 0 ? 0
+    : rb === 0 ? bonusPerTime * nSemi
+    : bonusPerTime * (1 - Math.pow(1 + rb, -nSemi)) / rb;
+  return Math.max(0, Math.round(pMonthly + pBonus));
+}
+
+// ─── Loan calculation ─────────────────────────────────────────────────────────
+function calcLoan({ principal, annualRate, years, type, bonusP }) {
+  if (years <= 0 || principal <= 0) return { monthlyPayment: 0, bonusPayment: 0, totalInterest: 0, totalPayment: 0, schedule: [] };
+  const months = years * 12;
+  const r  = annualRate / 100 / 12;
+  const rb = annualRate / 100 / 2;
+  const nSemi = years * 2;
+  const monthlyP = principal - bonusP;
+  const calcPmt = (p, rate, n) => {
+    if (n === 0 || p === 0) return 0;
+    if (rate === 0) return p / n;
+    return (p * rate * Math.pow(1 + rate, n)) / (Math.pow(1 + rate, n) - 1);
+  };
+  if (type === "equal-payment") {
+    const monthlyPayment = calcPmt(monthlyP, r, months);
+    const bonusPayment   = calcPmt(bonusP, rb, nSemi);
+    let balM = monthlyP, balB = bonusP, totalInterest = 0;
+    const schedule = [];
+    for (let i = 1; i <= months; i++) {
+      const intM = balM * r, prinM = monthlyPayment - intM;
+      balM = Math.max(0, balM - prinM); totalInterest += intM;
+      let bonusPay = 0, intB = 0;
+      if (bonusP > 0 && i % 6 === 0) {
+        intB = balB * rb; balB = Math.max(0, balB - (bonusPayment - intB));
+        bonusPay = bonusPayment; totalInterest += intB;
+      }
+      schedule.push({ month: i, monthlyPayment, bonusPay, interest: intM + intB, principal: prinM + (bonusPay > 0 ? bonusPayment - intB : 0), balance: balM + balB });
+    }
+    return { monthlyPayment, bonusPayment, totalInterest, totalPayment: monthlyPayment * months + bonusPayment * nSemi, schedule };
+  } else {
+    const ppM = monthlyP / months, ppB = bonusP > 0 ? bonusP / nSemi : 0;
+    let balM = monthlyP, balB = bonusP, totalInterest = 0, totalPayment = 0;
+    const schedule = [];
+    for (let i = 1; i <= months; i++) {
+      const intM = balM * r; balM = Math.max(0, balM - ppM);
+      const payM = ppM + intM; totalInterest += intM;
+      let bonusPay = 0, intB = 0;
+      if (bonusP > 0 && i % 6 === 0) {
+        intB = balB * rb; balB = Math.max(0, balB - ppB);
+        bonusPay = ppB + intB; totalInterest += intB;
+      }
+      totalPayment += payM + bonusPay;
+      schedule.push({ month: i, monthlyPayment: payM, bonusPay, interest: intM + intB, principal: ppM + ppB, balance: balM + balB });
+    }
+    return { monthlyPayment: schedule[0].monthlyPayment, bonusPayment: bonusP > 0 ? schedule[5].bonusPay : 0, totalInterest, totalPayment, schedule };
+  }
+}
+
+// NISA積立シミュレーション: 毎月C万円、年利r%、n月後の評価額
+function nisaBalance(monthlyMan, annualRate, months) {
+  if (monthlyMan <= 0 || months <= 0) return 0;
+  const C  = monthlyMan * 10000;
+  const rm = annualRate / 100 / 12;
+  if (rm === 0) return C * months;
+  return C * (Math.pow(1 + rm, months) - 1) / rm * (1 + rm);
+}
+
+// 早期完済可能月を探す
+function findEarlyRepayMonth(schedule, monthlyMan, nisaRate, maxYears) {
+  if (maxYears <= 0 || monthlyMan <= 0) return null;
+  const maxM = maxYears * 12;
+  for (let i = 0; i < Math.min(schedule.length, maxM); i++) {
+    const nisa = nisaBalance(monthlyMan, nisaRate, i + 1);
+    if (nisa >= schedule[i].balance) return i + 1; // 1-indexed month
+  }
+  return null;
+}
+
+// 返済負担率の表示：切り捨て（四捨五入・切り上げなし）
+const floorPct = (val, d = 1) => (Math.floor(val * Math.pow(10, d)) / Math.pow(10, d)).toFixed(d);
+
+// ─── NumberField（スライダーなし・直接テンキー入力）────────────────────────────
+function Slider({ label, value, min, max, step, unit, onChange, format, disabled, color = "#7A5F45" }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft]     = useState("");
+  const inputRef = useRef(null);
+
+  const startEdit = () => {
+    if (disabled) return;
+    setDraft(value === 0 ? "" : value.toString());
+    setEditing(true);
+    setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select(); }, 0);
+  };
+
+  const commit = () => {
+    const p = parseFloat(draft.replace(/,/g, ""));
+    if (!isNaN(p)) {
+      const clamped = Math.min(max, Math.max(min, p));
+      onChange(parseFloat(clamped.toFixed(10)));
+    }
+    setEditing(false);
+  };
+
+  const hk = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); commit(); }
+    if (e.key === "Escape") setEditing(false);
+    if (e.key === "ArrowUp")   { e.preventDefault(); const v = Math.min(max, parseFloat((value + step).toFixed(10))); onChange(v); setDraft(v.toString()); }
+    if (e.key === "ArrowDown") { e.preventDefault(); const v = Math.max(min, parseFloat((value - step).toFixed(10))); onChange(v); setDraft(v.toString()); }
+  };
+
+  const dv = format ? format(value) : value === 0 ? "0" : value.toLocaleString("ja-JP");
+  const im = step % 1 !== 0 ? "decimal" : "numeric";
+  const isEmpty = value === 0;
+
+  return (
+    <div style={{ marginBottom: 14, opacity: disabled ? 0.38 : 1, transition: "opacity 0.2s" }}>
+      <div style={{ fontSize: 11, color: "#8A7F76", letterSpacing: "0.04em", marginBottom: 4 }}>{label}</div>
+      <div onClick={!editing && !disabled ? startEdit : undefined}
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: editing ? "#FDFAF6" : "#FFFFFF", border: `1.5px solid ${editing ? color : "#DDD8D0"}`, borderRadius: 10, padding: "10px 14px", cursor: disabled ? "default" : "text", transition: "border-color 0.15s, background 0.15s", minHeight: 48 }}>
+        {editing ? (
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={hk}
+            inputMode={im}
+            pattern="[0-9]*[.,]?[0-9]*"
+            placeholder="0"
+            style={{ flex: 1, fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 600, color, border: "none", background: "transparent", outline: "none", textAlign: "right", padding: 0, minWidth: 0, WebkitAppearance: "none", width: "100%" }}
+          />
+        ) : (
+          <span style={{ flex: 1, fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 600, color: isEmpty ? "#CCC8C0" : "#1a1a1a", textAlign: "right" }}>
+            {isEmpty ? "0" : dv}
+          </span>
+        )}
+        <span style={{ fontSize: 13, color: editing ? color : "#B8B0A4", marginLeft: 6, fontFamily: "'Noto Sans JP', sans-serif", flexShrink: 0 }}>{unit}</span>
+      </div>
+    </div>
+  );
+}
+
+function MiniTab({ options, value, onChange, color }) {
+  return (
+    <div style={{ display: "flex", background: "#EDE8E2", borderRadius: 8, padding: 2, gap: 2 }}>
+      {options.map(([val, lbl]) => (
+        <button key={val} onClick={() => onChange(val)} style={{ flex: 1, padding: "4px 8px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 500, background: value === val ? "#fff" : "transparent", color: value === val ? color : "#bbb", boxShadow: value === val ? "0 1px 4px rgba(0,0,0,0.1)" : "none", transition: "all 0.18s" }}>{lbl}</button>
+      ))}
+    </div>
+  );
+}
+function Toggle({ value, onChange, color }) {
+  return (
+    <button onClick={() => onChange(!value)} style={{ position: "relative", width: 44, height: 26, borderRadius: 13, border: "none", cursor: "pointer", background: value ? color : "#e0dbd5", transition: "background 0.25s", flexShrink: 0, boxShadow: value ? `0 2px 8px ${color}66` : "none", padding: 0 }}>
+      <span style={{ position: "absolute", top: 3, left: value ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.25s", boxShadow: "0 1px 4px rgba(0,0,0,0.2)", display: "block" }} />
+    </button>
+  );
+}
+
+// ─── 運用年数→利回り提案ロジック ─────────────────────────────────────────────
+function suggestByYears(years) {
+  if (years <= 5) return {
+    rate: 2.0, risk: "低リスク", riskColor: "#5a9a6a", riskBg: "#edf7f1",
+    label: "短期〜5年：安定重視", desc: "元本割れリスクを抑えた安全資産中心の運用が適しています。",
+    products: [
+      { name: "個人向け国債（変動10年）", ticker: "国債", return: "〜1.5%", risk: "★☆☆", memo: "元本保証・半年ごと金利見直し", color: "#5a9a6a" },
+      { name: "eMAXIS Slim 国内債券インデックス", ticker: "債券型", return: "〜2%", risk: "★☆☆", memo: "国内債券連動・低コスト", color: "#5a9a6a" },
+      { name: "MRF / 普通預金（高金利口座）", ticker: "預金", return: "〜0.5%", risk: "★☆☆", memo: "流動性重視・いつでも引出し可", color: "#7aaa7a" },
+    ]
+  };
+  if (years <= 10) return {
+    rate: 4.0, risk: "中リスク", riskColor: "#7A5F45", riskBg: "#FAF7F2",
+    label: "中期5〜10年：バランス型", desc: "株式と債券を組み合わせたバランス運用で安定した成長が期待できます。",
+    products: [
+      { name: "eMAXIS Slim バランス（8資産均等型）", ticker: "バランス", return: "〜4%", risk: "★★☆", memo: "8資産に均等分散・NISAつみたて対応", color: "#7A5F45" },
+      { name: "セゾン・バンガード・グローバルバランスファンド", ticker: "バランス", return: "〜4%", risk: "★★☆", memo: "世界株式50%+債券50%のシンプル構成", color: "#7A5F45" },
+      { name: "ひふみプラス", ticker: "国内株", return: "〜5%", risk: "★★☆", memo: "国内中小株中心のアクティブファンド", color: "#b08860" },
+    ]
+  };
+  if (years <= 20) return {
+    rate: 5.5, risk: "中〜高リスク", riskColor: "#7a7aaa", riskBg: "#f4f4fb",
+    label: "中長期10〜20年：全世界株式型", desc: "時間を味方につけた長期積立で、全世界の成長を取り込みましょう。",
+    products: [
+      { name: "eMAXIS Slim 全世界株式（オール・カントリー）", ticker: "全世界株", return: "〜6%", risk: "★★★", memo: "50カ国・3000銘柄以上。NISAで最人気", color: "#5a5aaa" },
+      { name: "eMAXIS Slim 米国株式（S&P500）", ticker: "S&P500", return: "〜7%", risk: "★★★", memo: "米国優良500社連動。長期実績が豊富", color: "#5a5aaa" },
+      { name: "SBI・V・S&P500インデックスファンド", ticker: "S&P500", return: "〜7%", risk: "★★★", memo: "バンガード社運用・低コスト", color: "#7a7aaa" },
+    ]
+  };
+  return {
+    rate: 7.0, risk: "高リスク", riskColor: "#aa5a6a", riskBg: "#fdf2f4",
+    label: "長期20年超：成長株式型", desc: "20年以上の長期では価格変動を乗り越え、高い成長期待の資産が有利です。",
+    products: [
+      { name: "eMAXIS Slim 全世界株式（オール・カントリー）", ticker: "全世界株", return: "〜7%", risk: "★★★", memo: "長期保有で複利効果を最大化", color: "#aa5a6a" },
+      { name: "楽天・全米株式インデックスファンド", ticker: "全米株", return: "〜8%", risk: "★★★", memo: "VTI連動・米国全市場をカバー", color: "#aa5a6a" },
+      { name: "ニッセイNASDAQ100インデックスファンド", ticker: "NASDAQ", return: "〜9%", risk: "★★★", memo: "米国テクノロジー成長株中心・高ボラ", color: "#c06070" },
+    ]
+  };
+}
+
+// 目標月数・NISAレートから必要な月々積立額（万円）を逆算
+function calcRequiredMonthly(schedule, targetMonth, nisaRate) {
+  if (!schedule || targetMonth <= 0 || targetMonth > schedule.length) return null;
+  const balance = schedule[targetMonth - 1]?.balance ?? 0;
+  if (balance <= 0) return 0;
+  const rm = nisaRate / 100 / 12;
+  if (rm === 0) return balance / targetMonth / 10000;
+  const C = balance * rm / ((Math.pow(1 + rm, targetMonth) - 1) * (1 + rm));
+  return C / 10000; // 万円
+}
+
+// ─── NISA早期完済パネル ────────────────────────────────────────────────────────
+function NisaPanel({ p, set, onChange, schedule, principal, color, border, bg, diffMan = 0, diffYen = 0, baseYears = 35 }) {
+  const suggestion = suggestByYears(p.nisaYears);
+
+  const earlyMonth = useMemo(() => {
+    if (!p.nisaEnabled || schedule.length === 0) return null;
+    return findEarlyRepayMonth(schedule, p.nisaMonthly, p.nisaRate, p.nisaYears);
+  }, [p.nisaEnabled, p.nisaMonthly, p.nisaRate, p.nisaYears, schedule]);
+
+  const nisaAtEarly      = earlyMonth ? nisaBalance(p.nisaMonthly, p.nisaRate, earlyMonth) : 0;
+  const loanAtEarly      = earlyMonth ? (schedule[earlyMonth - 1]?.balance ?? 0) : 0;
+  const totalNisaContrib = p.nisaMonthly * (earlyMonth ?? p.nisaYears * 12) * 10000;
+  const normalTotalPay   = schedule.reduce((s, m) => s + m.monthlyPayment + m.bonusPay, 0);
+  const earlyLoanPay     = earlyMonth ? schedule.slice(0, earlyMonth).reduce((s, m) => s + m.monthlyPayment + m.bonusPay, 0) : 0;
+  const interestSaved    = earlyMonth ? (normalTotalPay - earlyLoanPay - loanAtEarly) : 0;
+  const earlyYears  = earlyMonth ? Math.floor(earlyMonth / 12) : null;
+  const earlyMonths = earlyMonth ? earlyMonth % 12 : null;
+  const savedYears  = earlyMonth ? p.years - Math.ceil(earlyMonth / 12) : null;
+
+  // 逆算①：基本パターン年数で完済するのに必要な積立額
+  const reqForBaseYears = calcRequiredMonthly(schedule, baseYears * 12, p.nisaRate);
+
+  // 逆算②：目標年数で完済するのに必要な積立額
+  const reqForTarget = calcRequiredMonthly(schedule, p.nisaTargetYears * 12, p.nisaRate);
+
+  // 必要積立額を円単位で表示（1円単位切り上げ）/ set時は万円floatのまま渡す
+  const exactYen  = (val) => Math.round(val * 10000);  // 万円→円（四捨五入、切り上げなし）
+  const exactMan  = (val) => exactYen(val) / 10000;   // セット用（精度保持）
+
+  const isSuggestedRate = Math.abs(p.nisaRate - suggestion.rate) < 0.01;
+
+  return (
+    <div className="nisa-section" style={{ borderTop: "1px solid #EDE8E2", paddingTop: 16, marginTop: 4 }}>
+      {/* トグル行 */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: p.nisaEnabled ? 16 : 0 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#3a5a9a" }}>📈</span>
+            <span style={{ fontSize: 13, color: "#3a5a9a", fontWeight: 600 }}>つみたてNISA早期完済</span>
+          </div>
+          <div style={{ fontSize: 10, color: "#bbb", marginTop: 1 }}>積立投資で繰上返済をシミュレーション</div>
+        </div>
+        <Toggle value={p.nisaEnabled} onChange={(v) => onChange({ ...p, nisaEnabled: v })} color="#3a5a9a" />
+      </div>
+
+      {p.nisaEnabled && (
+        <div style={{ animation: "fadeIn 0.2s ease" }}>
+          {/* ① 運用年数（最初に設定） */}
+          <Slider label="最大運用年数" value={p.nisaYears} min={0} max={40} step={1} unit="年" onChange={set("nisaYears")} color="#3a5a9a" />
+
+          {/* ② 運用年数ベースの提案カード */}
+          <div style={{ background: suggestion.riskBg, borderRadius: 12, padding: "12px 14px", border: `1px solid ${suggestion.riskColor}44`, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 10, color: suggestion.riskColor, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 2 }}>{p.nisaYears}年運用の推奨</div>
+                <div style={{ fontSize: 12, color: "#1a1a1a", fontWeight: 600 }}>{suggestion.label}</div>
+                <div style={{ fontSize: 10, color: "#888", marginTop: 3, lineHeight: 1.5 }}>{suggestion.desc}</div>
+              </div>
+              <div style={{ textAlign: "center", flexShrink: 0, marginLeft: 10 }}>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 700, color: suggestion.riskColor, lineHeight: 1 }}>{suggestion.rate}%</div>
+                <div style={{ fontSize: 9, color: "#aaa" }}>推奨利回り</div>
+              </div>
+            </div>
+            {/* リスク帯バッジ */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 20, background: suggestion.riskColor, color: "#fff", fontSize: 10, fontWeight: 600 }}>{suggestion.risk}</span>
+              <button onClick={() => onChange({ ...p, nisaRate: suggestion.rate })} style={{
+                padding: "5px 12px", borderRadius: 20, border: `1.5px solid ${suggestion.riskColor}`,
+                background: isSuggestedRate ? suggestion.riskColor : "transparent",
+                color: isSuggestedRate ? "#fff" : suggestion.riskColor,
+                fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all 0.2s",
+              }}>
+                {isSuggestedRate ? "✓ 適用中" : "この利回りを適用"}
+              </button>
+            </div>
+          </div>
+
+          {/* ③ 提案商品リスト */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 8, fontWeight: 600 }}>提案商品</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {suggestion.products.map((prod) => (
+                <div key={prod.name} style={{ background: "#F0EDE8", borderRadius: 10, padding: "9px 12px", display: "flex", alignItems: "center", gap: 10, borderLeft: `3px solid ${prod.color}` }}>
+                  <div style={{ flexShrink: 0 }}>
+                    <div style={{ background: prod.color, color: "#fff", borderRadius: 6, padding: "2px 6px", fontSize: 9, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap" }}>{prod.ticker}</div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.3, marginBottom: 2 }}>{prod.name}</div>
+                    <div style={{ fontSize: 10, color: "#aaa" }}>{prod.memo}</div>
+                  </div>
+                  <div style={{ flexShrink: 0, textAlign: "right" }}>
+                    <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 13, fontWeight: 700, color: prod.color }}>{prod.return}</div>
+                    <div style={{ fontSize: 9, color: "#ccc" }}>{prod.risk}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: "#ccc", marginTop: 6 }}>※ 過去の実績であり将来の成果を保証するものではありません</div>
+          </div>
+
+          {/* ④ 差額提案バナー（差額がある場合） */}
+          {diffMan > 0 && (
+            <div style={{ background: "linear-gradient(135deg,#e8f0fc,#d8e8f8)", borderRadius: 12, padding: "12px 14px", marginBottom: 14, border: "1px solid #b0caf0" }}>
+              <div style={{ fontSize: 10, color: "#3a5a9a", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 4 }}>💡 差額活用の提案</div>
+              <div style={{ fontSize: 12, color: "#1a1a1a", marginBottom: 2 }}>
+                基本パターンより月々 <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, fontWeight: 700, color: "#3a5a9a" }}>¥{fmt(diffYen)}</span> お得です
+              </div>
+              <div style={{ fontSize: 11, color: "#5a7aaa", marginBottom: 10, lineHeight: 1.5 }}>
+                この差額をそのままNISA積立に回すと、さらに早期完済が可能になります。
+              </div>
+              <button onClick={() => onChange({ ...p, nisaMonthly: Math.max(0.1, diffYen / 10000) })}
+                style={{ width: "100%", padding: "8px 0", borderRadius: 10, border: "none", cursor: "pointer", background: "linear-gradient(135deg,#4a6adf,#3a5aaf)", color: "#fff", fontSize: 12, fontWeight: 600, boxShadow: "0 2px 8px rgba(58,90,175,0.35)", transition: "opacity 0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+                onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+                差額 ¥{fmt(diffYen)} をNISA積立額に設定する
+              </button>
+            </div>
+          )}
+
+          {/* ④-a 基本パターン期間で完済できる積立額 */}
+          {reqForBaseYears !== null && (
+            <div style={{ background: "#f0f4ff", borderRadius: 12, padding: "12px 14px", marginBottom: 10, border: "1px solid #b8caee" }}>
+              <div style={{ fontSize: 10, color: "#4a6abf", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 4 }}>🏁 基本パターンと同じ{baseYears}年で完済</div>
+              {reqForBaseYears === 0 ? (
+                <div style={{ fontSize: 12, color: "#5a9a6a" }}>すでに{baseYears}年以内に完済できます！</div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, color: "#1a1a1a", marginBottom: 2 }}>
+                    必要な月々積立額
+                    <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 700, color: "#3a5a9a", margin: "0 6px" }}>
+                      ¥{fmt(exactYen(reqForBaseYears))}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#7a9adf" }}>/ 月</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: "#7a9adf", marginBottom: 8 }}>
+                    想定利回り {p.nisaRate}% で{baseYears}年積立 → 残債一括返済
+                  </div>
+                  <button onClick={() => onChange({ ...p, nisaMonthly: exactMan(reqForBaseYears) })}
+                    style={{ width: "100%", padding: "7px 0", borderRadius: 9, border: "none", cursor: "pointer", background: "#3a5a9a", color: "#fff", fontSize: 11, fontWeight: 600, boxShadow: "0 2px 6px rgba(58,90,154,0.3)", transition: "opacity 0.2s" }}
+                    onMouseEnter={e => e.currentTarget.style.opacity="0.8"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+                    ¥{fmt(exactYen(reqForBaseYears))} を積立額に反映する
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ④-b 目標年数を指定して必要積立額を逆算 */}
+          <div style={{ background: "#f4f0fb", borderRadius: 12, padding: "12px 14px", marginBottom: 14, border: "1px solid #c8b8ee" }}>
+            <div style={{ fontSize: 10, color: "#6a4abf", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 8 }}>🎯 完済目標年数から積立額を逆算</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: "#6B6158", whiteSpace: "nowrap" }}>目標完済</span>
+              <div style={{ flex: 1 }}>
+                <Slider label="" value={p.nisaTargetYears} min={0} max={p.years} step={1} unit="年後" onChange={set("nisaTargetYears")} color="#6a4abf" />
+              </div>
+            </div>
+            {reqForTarget === null ? (
+              <div style={{ fontSize: 11, color: "#aaa" }}>目標年数がローン期間を超えています</div>
+            ) : reqForTarget === 0 ? (
+              <div style={{ fontSize: 12, color: "#5a9a6a" }}>すでにその年数以内に完済できます！</div>
+            ) : (
+              <>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: "#888" }}>必要な月々積立額</span>
+                  <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, color: "#6a4abf" }}>
+                    ¥{fmt(exactYen(reqForTarget))}
+                  </span>
+                  <span style={{ fontSize: 11, color: "#9a7adf" }}>/ 月</span>
+                </div>
+                <div style={{ fontSize: 10, color: "#9a7adf", marginBottom: 8 }}>
+                  利回り {p.nisaRate}% で{p.nisaTargetYears}年積立 → {p.nisaTargetYears}年後に残債一括返済
+                </div>
+                <button onClick={() => onChange({ ...p, nisaMonthly: exactMan(reqForTarget) })}
+                  style={{ width: "100%", padding: "7px 0", borderRadius: 9, border: "none", cursor: "pointer", background: "linear-gradient(135deg,#6a4abf,#8a6adf)", color: "#fff", fontSize: 11, fontWeight: 600, boxShadow: "0 2px 6px rgba(106,74,191,0.3)", transition: "opacity 0.2s" }}
+                  onMouseEnter={e => e.currentTarget.style.opacity="0.8"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+                  ¥{fmt(exactYen(reqForTarget))} を積立額に反映する
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* ④ 積立額と利回りスライダー */}
+          <Slider label="月々の積立額" value={Math.round(p.nisaMonthly * 10000)} min={0} max={300000} step={100} unit="円" onChange={v => set("nisaMonthly")(v / 10000)} format={v => fmt(Math.round(v))} color="#3a5a9a" />
+          <div style={{ position: "relative" }}>
+            <Slider label="想定年利回り" value={p.nisaRate} min={0} max={20.0} step={0.01} unit="%" onChange={set("nisaRate")} format={v => v.toFixed(2)} color="#3a5a9a" />
+            {isSuggestedRate && (
+              <div style={{ position: "absolute", right: 0, top: 0, fontSize: 9, color: suggestion.riskColor, background: suggestion.riskBg, padding: "1px 6px", borderRadius: 10, border: `1px solid ${suggestion.riskColor}44` }}>
+                推奨値
+              </div>
+            )}
+          </div>
+
+          {/* ⑤ 結果カード */}
+          {earlyMonth ? (
+            <div style={{ background: "linear-gradient(135deg,#1a2a4a,#2a3a6a)", borderRadius: 14, padding: "18px", color: "#fff", marginTop: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <div style={{ background: "#4a8adf", borderRadius: 20, padding: "3px 10px", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em" }}>EARLY REPAYMENT</div>
+              </div>
+              <div style={{ fontSize: 11, color: "#8aacdf", marginBottom: 4 }}>繰上完済可能時期</div>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 34, fontWeight: 700, lineHeight: 1, marginBottom: 4 }}>
+                {earlyYears > 0 ? `${earlyYears}年` : ""}{earlyMonths > 0 ? `${earlyMonths}ヶ月` : ""}後
+              </div>
+              <div style={{ fontSize: 11, color: "#8aacdf", marginBottom: 16 }}>
+                通常完済より <span style={{ color: "#fff", fontWeight: 700 }}>{savedYears}年</span> 早い
+              </div>
+              <div className="nisa-result-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {[
+                  { label: "NISA評価額", value: `¥${fmtM(nisaAtEarly)}万`, sub: `積立合計 ¥${fmtM(totalNisaContrib)}万`, accent: true },
+                  { label: "残債残高", value: `¥${fmtM(loanAtEarly)}万`, sub: "このタイミングで一括返済" },
+                  { label: "利息節約効果", value: interestSaved > 0 ? `¥${fmtM(interestSaved)}万` : "—", sub: "ローン利息の削減分", accent: interestSaved > 0 },
+                  { label: "運用益（概算）", value: `¥${fmtM(nisaAtEarly - totalNisaContrib)}万`, sub: `利回り ${p.nisaRate}% 想定` },
+                ].map(({ label, value, sub, accent }) => (
+                  <div key={label} style={{ background: "rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 12px", borderLeft: accent ? "3px solid #4a8adf" : "none" }}>
+                    <div style={{ fontSize: 9, color: "#6a8abf", marginBottom: 3, letterSpacing: "0.06em" }}>{label}</div>
+                    <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, fontWeight: 700, color: accent ? "#8acdff" : "#fff" }}>{value}</div>
+                    <div style={{ fontSize: 9, color: "#6a8abf", marginTop: 2 }}>{sub}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 10, color: "#6a8abf", marginBottom: 6 }}>返済期間の短縮イメージ</div>
+                <div style={{ height: 8, background: "rgba(255,255,255,0.1)", borderRadius: 4, position: "relative", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${(earlyMonth / (p.years * 12)) * 100}%`, background: "linear-gradient(90deg,#4a8adf,#6aaaff)", borderRadius: 4 }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 10, color: "#6a8abf" }}>
+                  <span>現在</span>
+                  <span style={{ color: "#6aaaff" }}>繰上完済（{earlyYears > 0 ? `${earlyYears}年後` : `${earlyMonths}ヶ月後`}）</span>
+                  <span>当初完済（{p.years}年後）</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ background: "#F0EDE8", borderRadius: 12, padding: "14px 16px", textAlign: "center", color: "#aaa", fontSize: 12 }}>
+              <div style={{ fontSize: 20, marginBottom: 6 }}>📊</div>
+              {p.nisaYears}年間の積立では繰上完済に届きません<br />
+              <span style={{ fontSize: 11 }}>積立額・年数・利回りを増やしてみてください</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Pattern Panel ────────────────────────────────────────────────────────────
+function PatternPanel({ p, onChange, idx, income1, income2, otherDebt = 0, burdenRate, auditRate, baseMonthlyPayment = 0, basePatternYears = 35 }) {
+  const color  = PATTERN_COLORS[idx];
+  const bg     = PATTERN_BG[idx];
+  const border = PATTERN_BORDER[idx];
+  const set    = (key) => (val) => onChange({ ...p, [key]: val });
+
+  const downPayment = Math.min(p.equityAmountMan * 10000, 999999 * 10000);
+  const bonusPerTimeYen = p.bonusEnabled ? p.bonusAmountMan * 10000 : 0;
+
+  // 物件価格モード
+  const resolvedPrice = p.priceMode === "monthly"
+    ? (() => {
+        const principal_ = calcPrincipalFromMonthly({ monthly: p.desiredMonthly * 10000, bonusPerTime: bonusPerTimeYen, rate: p.rate, years: p.years });
+        return Math.round((principal_ + downPayment) / 10000);
+      })()
+    : p.price;
+
+  const principal = Math.max(0, resolvedPrice * 10000 - downPayment);
+
+  // ボーナス払い: 金額指定のみ (PV逆算)
+  const bonusP = !p.bonusEnabled ? 0 : (() => {
+    const rb = p.rate / 100 / 2, nS = p.years * 2, B = bonusPerTimeYen;
+    if (rb === 0) return Math.min(Math.round(B * nS), principal - 1);
+    return Math.min(Math.round(B * (1 - Math.pow(1 + rb, -nS)) / rb), principal - 1);
+  })();
+
+  const result = useMemo(() => calcLoan({ principal, annualRate: p.rate, years: p.years, type: p.type, bonusP }),
+    [principal, p.rate, p.years, p.type, bonusP]);
+
+  const totalInterestRate = principal > 0 ? (result.totalInterest / principal * 100).toFixed(1) : "0";
+
+  const totalIncome = (income1 + income2) * 10000;
+  const otherDebtYen = otherDebt * 10000;                                   // 他借入年間支払（円）
+  const ra = auditRate / 100 / 12, n = p.years * 12;
+  const auditM = ra === 0 || principal === 0 ? principal / (n||1)
+    : (principal * ra * Math.pow(1+ra, n)) / (Math.pow(1+ra, n) - 1);
+  // 実際の返済負担率 = (住宅ローン年間 + 他借入年間) / 年収
+  const actualBurden  = totalIncome > 0 ? (auditM * 12 + otherDebtYen) / totalIncome * 100 : 0;
+  // 住宅ローンに使える月額 = (年収 × 負担率 - 他借入年間) / 12
+  const maxBorrowable = (() => {
+    const mm = Math.max(0, totalIncome * burdenRate / 100 - otherDebtYen) / 12;
+    if (ra===0) return mm*n;
+    return mm*(1-Math.pow(1+ra,-n))/ra;
+  })();
+  const isOK = totalIncome === 0 ? null : principal <= maxBorrowable;
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.07)", border: `2px solid ${border}` }}>
+      {/* Header */}
+      <div style={{ background: `linear-gradient(135deg,${color}22,${color}0a)`, borderBottom: `1px solid ${border}`, padding: "13px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <div style={{ width: 30, height: 30, borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, fontWeight: 700 }}>{PATTERN_LABELS[idx]}</div>
+          <span style={{ fontFamily: "'Shippori Mincho B1', serif", fontSize: 15, fontWeight: 600, color: "#2A2018" }}>
+            {idx === 0 ? "基本パターン" : `比較パターン ${PATTERN_LABELS[idx]}`}
+          </span>
+        </div>
+        {isOK !== null && (
+          <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 20, background: isOK ? "#edf7f1" : "#fdf0ee", border: `1px solid ${isOK ? "#a8d4b4" : "#e8a898"}` }}>
+            <div style={{ width: 18, height: 18, borderRadius: "50%", background: isOK ? "#4a9a6a" : "#c05040", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 8, fontWeight: 700 }}>
+              {isOK ? "OK" : "NG"}
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 600, color: isOK ? "#2a7a4a" : "#a03020" }}>{floorPct(actualBurden)}%</span>
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: "18px" }}>
+        {/* 毎月返済額ヒーロー */}
+        <div style={{ background: "linear-gradient(135deg,#1A140E,#271D12)", borderRadius: 13, padding: "15px 17px", marginBottom: 14, color: "#fff" }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.15em", color: "#B89A72", marginBottom: 2 }}>毎月の返済額</div>
+          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 30, fontWeight: 700, lineHeight: 1 }}>¥{fmt(result.monthlyPayment)}</div>
+          {idx > 0 && baseMonthlyPayment > 0 && (() => {
+            const diff = result.monthlyPayment - baseMonthlyPayment;
+            const cheaper = diff < 0;
+            const sign = cheaper ? "−" : "+";
+            const badgeBg = cheaper ? "rgba(80,160,255,0.22)" : "rgba(255,80,80,0.22)";
+            const badgeColor = cheaper ? "#60b0ff" : "#ff6060";
+            return (
+              <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 0, background: badgeBg, borderRadius: 10, overflow: "hidden", border: `1px solid ${badgeColor}44` }}>
+                  {/* 符号ブロック */}
+                  <div style={{ background: cheaper ? "#3080df" : "#df3030", padding: "4px 8px", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 26 }}>
+                    <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{sign}</span>
+                  </div>
+                  {/* 金額 */}
+                  <div style={{ padding: "4px 10px 4px 8px", display: "flex", alignItems: "baseline", gap: 4 }}>
+                    <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, fontWeight: 700, color: badgeColor }}>¥{fmt(Math.abs(diff))}</span>
+                    <span style={{ fontSize: 10, color: badgeColor, opacity: 0.8 }}>/ 月</span>
+                  </div>
+                </div>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", letterSpacing: "0.04em" }}>基本比</span>
+              </div>
+            );
+          })()}
+          {p.bonusEnabled && result.bonusPayment > 0 && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ fontSize: 10, color: "#B89A72", marginBottom: 1 }}>ボーナス加算（年2回）</div>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, fontWeight: 600 }}>¥{fmt(result.bonusPayment)}<span style={{ fontSize: 11, color: "#907060", marginLeft: 5 }}>/ 回</span></div>
+            </div>
+          )}
+        </div>
+
+        {/* Stats */}
+        <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginBottom: 14 }}>
+          {downPayment > 0 && (
+            <div style={{ gridColumn: "1 / -1", background: bg, borderRadius: 10, padding: "9px 13px", border: `1px solid ${border}` }}>
+              <div style={{ fontSize: 10, color: "#aaa", marginBottom: 5 }}>全体計画</div>
+              <div style={{ display: "flex", gap: 0, marginBottom: 7, height: 6, borderRadius: 3, overflow: "hidden" }}>
+                {[{v:downPayment,c:"#7a9aca"},{v:principal,c:color}].map(({v,c},i)=>(
+                  <div key={i} style={{ flex: v, background: c, opacity: 0.7 }} />
+                ))}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                <span style={{ color: "#7a9aca" }}>自己資金 ¥{fmtM(downPayment)}万 ({resolvedPrice > 0 ? (p.equityAmountMan / resolvedPrice * 100).toFixed(0) : 0}%)</span>
+                <span style={{ color, fontWeight: 600 }}>借入 ¥{fmtM(principal)}万</span>
+              </div>
+            </div>
+          )}
+          {[
+            { label: "借入金額", value: `¥${fmtM(principal)}万` },
+            { label: "返済総額", value: `¥${fmtM(result.totalPayment)}万` },
+            { label: "利息総額", value: `¥${fmtM(result.totalInterest)}万`, sub: `+${totalInterestRate}%`, accent: true },
+            { label: "完済時期", value: `${new Date().getFullYear()+p.years}年` },
+          ].map(({ label, value, sub, accent }) => (
+            <div key={label} style={{ background: "#F0EDE8", borderRadius: 9, padding: "9px 11px", borderLeft: accent ? `3px solid ${color}` : "none" }}>
+              <div style={{ fontSize: 10, color: "#aaa", marginBottom: 2 }}>{label}</div>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 700, color: accent ? color : "#1a1a1a" }}>{value}</div>
+              {sub && <div style={{ fontSize: 10, color: "#bbb" }}>{sub}</div>}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ height: 1, background: "#EDE8E2", margin: "0 0 14px" }} />
+
+        {/* 物件価格 */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
+            <span style={{ fontSize: 12, color: "#6B6158" }}>物件価格の入力方法</span>
+            <MiniTab options={[["amount","金額入力"],["monthly","月々支払から計算"]]} value={p.priceMode} onChange={v => onChange({ ...p, priceMode: v })} color={color} />
+          </div>
+          {p.priceMode === "amount" ? (
+            <Slider label="物件価格" value={p.price} min={0} max={99999} step={1} unit="万円" onChange={set("price")} color={color} format={v => Number.isInteger(v) ? v.toLocaleString("ja-JP") : v.toLocaleString("ja-JP", {maximumFractionDigits: 2})} />
+          ) : (
+            <>
+              <Slider label="月々支払希望額" value={p.desiredMonthly} min={0} max={999} step={1} unit="万円" onChange={set("desiredMonthly")} color={color} format={v => Number.isInteger(v) ? v.toLocaleString("ja-JP") : v.toLocaleString("ja-JP", {maximumFractionDigits: 2})} />
+              <div style={{ background: PATTERN_BG[idx], borderRadius: 10, padding: "10px 14px", border: `1.5px solid ${color}55`, marginTop: -4, marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: "#999", marginBottom: 2 }}>計算された物件価格（目安）</div>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 700, color }}>
+                  {resolvedPrice > 0 ? `¥${fmt(resolvedPrice)}万` : "—"}
+                </div>
+                <div style={{ fontSize: 10, color: "#bbb", marginTop: 2 }}>
+                  借入 ¥{fmtM(principal)}万 ＋ 自己資金 ¥{fmtM(downPayment)}万{bonusPerTimeYen > 0 ? `（ボーナス払い込み）` : ""}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* 自己資金（金額のみ） */}
+        <Slider label="自己資金" value={p.equityAmountMan} min={0} max={99999} step={1} unit="万円" onChange={set("equityAmountMan")} color={color} format={v => Number.isInteger(v) ? v.toLocaleString("ja-JP") : v.toLocaleString("ja-JP", {maximumFractionDigits: 2})} />
+        {p.equityAmountMan > 0 && resolvedPrice > 0 && (
+          <div style={{ fontSize: 11, color: "#aaa", textAlign: "right", marginTop: -10, marginBottom: 12 }}>
+            自己資金比率 {(p.equityAmountMan / resolvedPrice * 100).toFixed(1)}%
+          </div>
+        )}
+
+        <Slider label="金利（年）" value={p.rate} min={0} max={20.0} step={0.001} unit="%" onChange={set("rate")} format={v=>v.toFixed(3)} color={color} />
+        <Slider label="返済期間"  value={p.years} min={0} max={50} step={1} unit="年" onChange={set("years")} color={color} />
+
+        {/* 返済方法 */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: "#6B6158", marginBottom: 7 }}>返済方法</div>
+          <div style={{ display: "flex", gap: 7 }}>
+            {[["equal-payment","元利均等"],["equal-principal","元金均等"]].map(([val,lbl])=>(
+              <button key={val} onClick={()=>set("type")(val)} style={{ flex:1, padding:"7px 0", borderRadius:8, border:"none", cursor:"pointer", fontSize:12, fontWeight:500, background: p.type===val ? color : "#EDE8E2", color: p.type===val ? "#fff" : "#999", transition:"all 0.2s", boxShadow: p.type===val ? `0 2px 8px ${color}55` : "none" }}>{lbl}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* ボーナス払い（金額のみ） */}
+        <div style={{ borderTop: "1px solid #EDE8E2", paddingTop: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: p.bonusEnabled ? 12 : 0 }}>
+            <div>
+              <div style={{ fontSize: 12, color: "#6B6158" }}>ボーナス払い</div>
+              <div style={{ fontSize: 10, color: "#bbb", marginTop: 1 }}>{p.bonusEnabled ? "年2回（6月・12月）" : "オフ"}</div>
+            </div>
+            <Toggle value={p.bonusEnabled} onChange={set("bonusEnabled")} color={color} />
+          </div>
+          {p.bonusEnabled && (
+            <div style={{ animation: "fadeIn 0.2s ease" }}>
+              <Slider label="1回のボーナス払い額" value={p.bonusAmountMan} min={0} max={999} step={1} unit="万円" onChange={set("bonusAmountMan")} color={color} format={v => Number.isInteger(v) ? v.toLocaleString("ja-JP") : v.toLocaleString("ja-JP", {maximumFractionDigits: 2})} />
+              {result.bonusPayment > 0 && (
+                <div style={{ background: bg, borderRadius: 9, padding: "9px 13px", border: `1px solid ${border}`, fontSize: 11, color: "#888", display: "flex", justifyContent: "space-between", marginTop: -4 }}>
+                  <span>ローン計算上のボーナス返済額（目安）</span>
+                  <span style={{ fontFamily:"'Playfair Display', serif", fontSize:14, color:"#1a1a1a", fontWeight:700 }}>¥{fmt(result.bonusPayment)}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* NISA（比較A・Bのみ） */}
+        {idx > 0 && (() => {
+          // 差額は円単位で正確に（丸め不要）
+          const diffYen = baseMonthlyPayment > 0
+            ? Math.max(0, baseMonthlyPayment - result.monthlyPayment)
+            : 0;
+          const diffMan = diffYen / 10000; // 万円単位（小数あり）
+          return <NisaPanel p={p} set={set} onChange={onChange} schedule={result.schedule} principal={principal} color={color} border={border} bg={bg} diffMan={diffMan} diffYen={diffYen} baseYears={basePatternYears} />;
+        })()}
+      </div>
+    </div>
+  );
+}
+
+// ─── 比較テーブル ──────────────────────────────────────────────────────────────
+function CompareTable({ patterns, income1, income2, otherDebt = 0, burdenRate, auditRate }) {
+  const data = patterns.map((p) => {
+    const downPayment = p.equityAmountMan * 10000;
+    const bonusPerTimeYen_ = p.bonusEnabled ? p.bonusAmountMan * 10000 : 0;
+    const resolvedPrice_ = p.priceMode === "monthly"
+      ? (() => {
+          const pr_ = calcPrincipalFromMonthly({ monthly: p.desiredMonthly * 10000, bonusPerTime: bonusPerTimeYen_, rate: p.rate, years: p.years });
+          return Math.round((pr_ + downPayment) / 10000);
+        })()
+      : p.price;
+    const principal = Math.max(0, resolvedPrice_ * 10000 - downPayment);
+    const bonusP = !p.bonusEnabled ? 0 : (() => {
+      const rb = p.rate / 100 / 2, nS = p.years * 2, B = bonusPerTimeYen_;
+      if (rb === 0) return Math.min(Math.round(B * nS), principal - 1);
+      return Math.min(Math.round(B * (1 - Math.pow(1 + rb, -nS)) / rb), principal - 1);
+    })();
+    const result = calcLoan({ principal, annualRate: p.rate, years: p.years, type: p.type, bonusP });
+    const totalIncome = (income1 + income2) * 10000;
+    const otherDebtYen = otherDebt * 10000;
+    const ra = auditRate / 100 / 12, n = p.years * 12;
+    const auditM = ra === 0 || principal === 0 ? principal/(n||1) : (principal*ra*Math.pow(1+ra,n))/(Math.pow(1+ra,n)-1);
+    const actualBurden = totalIncome > 0 ? (auditM * 12 + otherDebtYen) / totalIncome * 100 : null;
+    const mm = Math.max(0, totalIncome * burdenRate / 100 - otherDebtYen) / 12;
+    const maxBorrow = ra === 0 ? mm * n : mm * (1 - Math.pow(1+ra,-n)) / ra;
+    const isOK = totalIncome === 0 ? null : principal <= maxBorrow;
+    const earlyMonth = p.nisaEnabled && result.schedule.length > 0
+      ? findEarlyRepayMonth(result.schedule, p.nisaMonthly, p.nisaRate, p.nisaYears) : null;
+    // 利息削減効果：基本パターンとの差（後でrows側で計算するためrawのinterestを返す）
+    // NISA早期完済による利息節約額
+    const nisaInterestSaved = (() => {
+      if (!earlyMonth) return null;
+      const normalTotal   = result.schedule.reduce((s, m) => s + m.monthlyPayment + m.bonusPay, 0);
+      const earlyLoanPay  = result.schedule.slice(0, earlyMonth).reduce((s, m) => s + m.monthlyPayment + m.bonusPay, 0);
+      const loanAtEarly   = result.schedule[earlyMonth - 1]?.balance ?? 0;
+      return Math.max(0, normalTotal - earlyLoanPay - loanAtEarly);
+    })();
+    return { principal, downPayment, result, actualBurden, isOK, earlyMonth, years: p.years,
+      totalInterest: result.totalInterest, totalPayment: result.totalPayment, nisaInterestSaved };
+  });
+
+  const rows = [
+    { label: "毎月の返済額",   vals: data.map(d => `¥${fmt(d.result.monthlyPayment)}`), lowerBetter: true },
+    { label: "ボーナス払い",   vals: data.map(d => d.result.bonusPayment > 0 ? `¥${fmt(d.result.bonusPayment)}/回` : "なし"), isText: true },
+    { label: "自己資金",       vals: data.map(d => `¥${fmtM(d.downPayment)}万`), lowerBetter: false },
+    { label: "借入金額",       vals: data.map(d => `¥${fmtM(d.principal)}万`), lowerBetter: true },
+    { label: "利息総額",       vals: data.map(d => `¥${fmtM(d.result.totalInterest)}万`), lowerBetter: true },
+    { label: "返済総額",       vals: data.map(d => `¥${fmtM(d.result.totalPayment)}万`), lowerBetter: true },
+    { label: "返済負担率",     vals: data.map(d => d.actualBurden !== null ? `${floorPct(d.actualBurden, 2)}%` : "—"), lowerBetter: true },
+    { label: "審査結果",       vals: data.map(d => d.isOK === null ? "—" : d.isOK ? "OK" : "NG"), isJudge: true },
+    { label: "📈 早期完済",    vals: data.map(d => d.earlyMonth ? `${Math.floor(d.earlyMonth/12)}年${d.earlyMonth%12>0?d.earlyMonth%12+"ヶ月":""}後` : "—"), isNisa: true,
+      subs: data.map(d => d.earlyMonth ? `${d.years - Math.ceil(d.earlyMonth/12)}年短縮` : "") },
+    { label: "💰 支払利息削減効果", vals: data.map((d, i) => {
+        if (i === 0) return "基準";
+        const saved = data[0].totalInterest - d.totalInterest;
+        return saved === 0 ? "±0" : saved > 0 ? `+¥${fmtM(saved)}万` : `-¥${fmtM(-saved)}万`;
+      }), isSaving: true,
+      subs: data.map((d, i) => {
+        if (i === 0) return "";
+        const saved = data[0].totalPayment - d.totalPayment;
+        return saved > 0 ? `総返済 +¥${fmtM(saved)}万` : saved < 0 ? `総返済 −¥${fmtM(-saved)}万` : "";
+      }) },
+    { label: "📈 運用完済 利息削減効果", vals: data.map((d, i) => {
+        if (i === 0) return "—";           // 基本パターンはNISAなし
+        if (d.nisaInterestSaved === null) return "—";
+        // 基本パターンの全利息と比較
+        const baseInterest = data[0].totalInterest;
+        const totalSaved   = baseInterest - (d.totalInterest - d.nisaInterestSaved);
+        return totalSaved > 0 ? `+¥${fmtM(totalSaved)}万` : totalSaved < 0 ? `-¥${fmtM(-totalSaved)}万` : "±0";
+      }), isNisaSaving: true,
+      subs: data.map((d, i) => {
+        if (i === 0 || d.nisaInterestSaved === null) return "";
+        return `運用利息節約 +¥${fmtM(d.nisaInterestSaved)}万`;
+      }) },
+  ];
+
+  const bestIdxs = rows.map(row => {
+    if (row.isText || row.isJudge || row.isNisa || row.isSaving || row.isNisaSaving || !row.lowerBetter) return null;
+    const nums = row.vals.map(v => parseFloat(v.replace(/[^0-9.]/g, "")));
+    if (nums.some(isNaN)) return null;
+    const min = Math.min(...nums);
+    return nums.map(n => n === min);
+  });
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 20, padding: "22px", boxShadow: "0 4px 24px rgba(0,0,0,0.07)" }}>
+      <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: "#2A2018", margin: "0 0 18px", fontWeight: 600, fontFamily: "'Shippori Mincho B1', serif" }}>比較サマリー</h2>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr>
+              <th className="compare-label-col" style={{ width: 120, textAlign: "left", paddingBottom: 10, color: "#aaa", fontWeight: 400, fontSize: 11 }}>項目</th>
+              {PATTERN_LABELS.map((lbl, i) => (
+                <th key={i} style={{ textAlign: "center", paddingBottom: 10, minWidth: 90 }}>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: `${PATTERN_COLORS[i]}18`, borderRadius: 20, padding: "3px 11px" }}>
+                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: PATTERN_COLORS[i] }} />
+                    <span style={{ color: PATTERN_COLORS[i], fontWeight: 700, fontSize: 12 }}>{lbl}</span>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={row.label} style={{ borderTop: `1px solid ${row.isNisa ? "#e0eaf8" : row.isSaving ? "#e0f0e8" : row.isNisaSaving ? "#e8e4f8" : "#EDE8E2"}`, background: row.isNisa ? "#f6f9ff" : row.isSaving ? "#f4faf6" : row.isNisaSaving ? "#f6f4fc" : "transparent" }}>
+                <td style={{ padding: "10px 0", color: row.isNisa ? "#3a5a9a" : row.isSaving ? "#3a7a5a" : row.isNisaSaving ? "#5a3a9a" : "#888", fontSize: 12, fontWeight: (row.isNisa || row.isSaving || row.isNisaSaving) ? 600 : 400 }}>{row.label}</td>
+                {row.vals.map((val, ci) => {
+                  const isBest  = bestIdxs[ri]?.[ci];
+                  const judgeOK = val === "OK", judgeNG = val === "NG";
+                  const isNisa  = row.isNisa && val !== "—";
+                  const sub     = row.subs?.[ci];
+                  void judgeNG;  // suppress unused warning
+                  return (
+                    <td key={ci} style={{ textAlign: "center", padding: "10px 8px", verticalAlign: "middle" }}>
+                      {row.isJudge ? (
+                        val === "—" ? <span style={{ color: "#ccc" }}>—</span> : (
+                          <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 20, background: judgeOK ? "#edf7f1" : "#fdf0ee", color: judgeOK ? "#2a7a4a" : "#a03020", fontWeight: 700, fontSize: 12, border: `1px solid ${judgeOK ? "#a8d4b4" : "#e8a898"}` }}>{val}</span>
+                        )
+                      ) : isNisa ? (
+                        <div>
+                          <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 20, background: "#e0eaf8", color: "#3a5a9a", fontWeight: 700, fontSize: 12, border: "1px solid #b0caf0" }}>{val}</span>
+                          {sub && <div style={{ fontSize: 10, color: "#7a9adf", marginTop: 2 }}>{sub}</div>}
+                        </div>
+                      ) : (row.isSaving || row.isNisaSaving) ? (
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                          {(val === "基準" || val === "—") ? (
+                            <span style={{ color: "#ccc", fontSize: 12 }}>{val}</span>
+                          ) : (() => {
+                            const isPlus  = val.startsWith("+");
+                            const isMinus = val.startsWith("-");
+                            const badgeBg    = isPlus ? "#e8f2ff" : isMinus ? "#fff0f0" : "#f5f5f5";
+                            const signBg     = isPlus ? "#2a6adf" : isMinus ? "#df2a2a" : "#aaa";
+                            const numColor   = isPlus ? "#1a5abf" : isMinus ? "#bf1a1a" : "#aaa";
+                            const sign       = isPlus ? "+" : isMinus ? "−" : "±";
+                            const numPart    = val.replace(/^[+\-±]/, "");
+                            const subIsPlus  = sub && (sub.startsWith("総返済 +") || sub.startsWith("運用利息節約 +"));
+                            const subIsMinus = sub && (sub.startsWith("総返済 −") || sub.startsWith("運用利息節約 -"));
+                            return (
+                              <>
+                                <div style={{ display: "inline-flex", alignItems: "center", gap: 0, borderRadius: 8, overflow: "hidden", border: `1px solid ${signBg}44`, background: badgeBg }}>
+                                  <div style={{ background: signBg, padding: "3px 6px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, fontWeight: 700, color: "#fff" }}>{sign}</span>
+                                  </div>
+                                  <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, fontWeight: 700, color: numColor, padding: "3px 8px 3px 6px" }}>{numPart}</span>
+                                </div>
+                                {sub && <div style={{ fontSize: 10, color: subIsPlus ? "#2a6adf" : subIsMinus ? "#df2a2a" : "#aaa", marginTop: 1 }}>{sub.replace("総返済 ", "").replace("運用利息節約 ", "")}</div>}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      ) : val === "—" ? (
+                        <span style={{ color: "#ccc" }}>—</span>
+                      ) : (
+                        <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 700, color: isBest ? PATTERN_COLORS[ci] : "#1a1a1a", background: isBest ? `${PATTERN_COLORS[ci]}12` : "transparent", padding: isBest ? "2px 7px" : "2px 0", borderRadius: 5 }}>
+                          {val}
+                        </span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ marginTop: 10, fontSize: 10, color: "#ccc" }}>※ 数値が最も小さい項目をハイライト表示 / 📈 つみたてNISA設定時のみ早期完済を表示</div>
+    </div>
+  );
+}
+
+// ─── 借りる人情報 ──────────────────────────────────────────────────────────────
+function BorrowerPanel({ income1, setIncome1, income2, setIncome2, otherDebt, setOtherDebt, burdenRate, setBurdenRate, auditRate, setAuditRate }) {
+  const total = income1 + income2;
+  return (
+    <div style={{ background: "#fff", borderRadius: 20, padding: "22px 26px", boxShadow: "0 4px 24px rgba(0,0,0,0.07)", marginBottom: 18 }}>
+      <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: "#2A2018", margin: "0 0 18px", fontWeight: 600, fontFamily: "'Shippori Mincho B1', serif" }}>借りる人の情報</h2>
+      <div className="borrower-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: "0 30px" }}>
+        <Slider label="主債務者 年収" value={income1} min={0} max={9999} step={1} unit="万円" onChange={setIncome1} format={v => Number.isInteger(v) ? v.toLocaleString("ja-JP") : v.toLocaleString("ja-JP", {maximumFractionDigits: 2})} />
+        <Slider label="合算者 年収"   value={income2} min={0} max={9999} step={1} unit="万円" onChange={setIncome2} format={v => Number.isInteger(v) ? v.toLocaleString("ja-JP") : v.toLocaleString("ja-JP", {maximumFractionDigits: 2})} />
+        <Slider label="他借入 年間支払合計" value={otherDebt} min={0} max={9999} step={1} unit="万円" onChange={setOtherDebt} format={v => Number.isInteger(v) ? v.toLocaleString("ja-JP") : v.toLocaleString("ja-JP", {maximumFractionDigits: 2})} />
+        <Slider label="返済負担率" value={burdenRate} min={0} max={60} step={0.1} unit="%" onChange={setBurdenRate} format={v => Number.isInteger(v) ? v.toString() : v.toFixed(1)} />
+        <Slider label="審査金利"      value={auditRate}  min={0} max={6.0} step={0.001} unit="%" onChange={setAuditRate} format={v=>v.toFixed(3)} />
+      </div>
+      {total > 0 && (() => {
+        const maxAnnual   = total * 10000 * burdenRate / 100;           // 年間上限返済可能額
+        const otherYen    = otherDebt * 10000;                          // 他借入年間支払
+        const availAnnual = Math.max(0, maxAnnual - otherYen);          // 住宅ローンに使える年間額
+        const availMonthly = Math.round(availAnnual / 12);
+        return (
+          <div style={{ background: "#F0EDE8", borderRadius: 11, padding: "11px 15px", fontSize: 12, color: "#888", display: "flex", gap: 16, flexWrap: "wrap", marginTop: 2 }}>
+            <span>年収合計 <strong style={{ color: "#1a1a1a", fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 600 }}>¥{fmt(total)}万</strong></span>
+            {otherDebt > 0 && (
+              <span>他借入控除後 <strong style={{ color: "#df2a2a", fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 600 }}>−¥{fmt(otherDebt)}万/年</strong></span>
+            )}
+            <span>住宅ローン充当可能月額 <strong style={{ color: availMonthly > 0 ? "#1a1a1a" : "#c05040", fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 600 }}>¥{fmt(availMonthly)}</strong></span>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+function MortgageApp() {
+  const [income1,    setIncome1]    = useState(0);
+  const [income2,    setIncome2]    = useState(0);
+  const [otherDebt,  setOtherDebt]  = useState(0);   // 他借入の年間支払い合計（万円）
+  const [burdenRate, setBurdenRate] = useState(0);
+  const [auditRate,  setAuditRate]  = useState(0);
+  const [customer,   setCustomer]   = useState("");   // お客様名（PDFに入る）
+  const today = new Date();
+  const todayJa = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+
+  const [patterns, setPatterns] = useState([
+    { ...DEFAULT_PATTERN },
+    { ...DEFAULT_PATTERN },
+    { ...DEFAULT_PATTERN },
+  ]);
+
+  const upd = (idx, next) => setPatterns(prev => prev.map((p, i) => i === idx ? next : p));
+
+  return (
+    <div id="print-root" className="app-root" style={{ minHeight: "100vh", background: "#EDEBE5", fontFamily: "'Noto Sans JP', sans-serif", display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 14px 80px" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Noto+Sans+JP:wght@300;400;500&family=Shippori+Mincho+B1:wght@400;500;600;800&display=swap" rel="stylesheet" />
+      <style>{`
+        @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+        /* ─── レスポンシブ対応 ─── */
+
+        /* タブレット以下：3パターンを1列に */
+        @media (max-width: 1024px) {
+          .pattern-grid { grid-template-columns: 1fr !important; }
+        }
+
+        /* スマホ：余白・フォントを縮小、グリッドを1列に */
+        @media (max-width: 640px) {
+          .app-root { padding: 16px 8px 60px !important; }
+          .pattern-grid { gap: 12px !important; }
+          .borrower-grid { gap: 0 16px !important; grid-template-columns: 1fr 1fr !important; }
+          .stats-grid { gap: 6px !important; }
+          .nisa-result-grid { grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
+          .compare-label-col { width: 78px !important; font-size: 10px !important; }
+          table { font-size: 11px !important; }
+        }
+
+        /* 非常に狭い画面：借りる人情報を1列に */
+        @media (max-width: 420px) {
+          .borrower-grid { grid-template-columns: 1fr !important; }
+        }
+
+        @media print {
+          @page { size: A4 landscape; margin: 12mm 10mm; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .no-print { display: none !important; }
+          /* スライダーなどインタラクション要素を非表示 */
+          input[type=range] { display: none !important; }
+          /* ページ全体のフォントを小さめに */
+          body { font-size: 11px !important; }
+          /* グリッドを印刷でも維持 */
+          div[style*="grid-template-columns: repeat(3"] {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+          }
+          /* ボックスシャドウをなくしてトナー節約 */
+          * { box-shadow: none !important; }
+        }
+      `}</style>
+
+      <div style={{ textAlign: "center", marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center", marginBottom: 10 }}>
+          <div style={{ width: 28, height: 1, background: "#B89A72" }} />
+          <span style={{ fontSize: 10, letterSpacing: "0.35em", color: "#7A5F45", fontWeight: 500, fontFamily: "'Cormorant Garamond', serif" }}>THE HAUS — MORTGAGE PLANNER</span>
+          <div style={{ width: 28, height: 1, background: "#B89A72" }} />
+        </div>
+        <h1 style={{ fontFamily: "'Shippori Mincho B1', serif", fontSize: "clamp(26px,5vw,40px)", color: "#1a1a1a", fontWeight: 700, margin: 0, lineHeight: 1.1 }}>住宅ローン<br /><span style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 400, fontSize: "clamp(20px,4vw,30px)", letterSpacing: "0.12em", color: "#7A5F45" }}>SIMULATOR</span></h1>
+        <div style={{ width: 34, height: 2, background: "#B89A72", margin: "16px auto 0" }} />
+
+        {/* お客様名の入力（画面用） */}
+        <div className="no-print" style={{ marginTop: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
+          <label htmlFor="customer-name" style={{ fontSize: 12, color: "#8A7F76", letterSpacing: "0.06em" }}>お客様名</label>
+          <div style={{ display: "flex", alignItems: "center", background: "#fff", border: "1.5px solid #DDD8D0", borderRadius: 10, padding: "6px 14px", width: "min(320px, 100%)", boxSizing: "border-box" }}>
+            <input id="customer-name" value={customer} onChange={e => setCustomer(e.target.value)} placeholder="例）山田 太郎"
+              style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontFamily: "'Shippori Mincho B1', serif", fontSize: 18, fontWeight: 600, color: "#1a1a1a" }} />
+            <span style={{ fontFamily: "'Shippori Mincho B1', serif", fontSize: 15, color: "#7A5F45", marginLeft: 6 }}>様</span>
+          </div>
+        </div>
+
+        {/* PDFだけに出る宛名と日付 */}
+        <div className="print-only" style={{ display: "none", marginTop: 18 }}>
+          {customer.trim() && (
+            <div style={{ fontFamily: "'Shippori Mincho B1', serif", fontSize: 24, fontWeight: 600, color: "#1a1a1a", letterSpacing: "0.04em" }}>
+              {customer.trim()} <span style={{ fontSize: 18 }}>様</span>
+            </div>
+          )}
+          <div style={{ fontSize: 11, color: "#8A7F76", marginTop: 6, letterSpacing: "0.06em" }}>ご提案日 {todayJa}</div>
+        </div>
+
+      </div>
+
+      <div style={{ width: "100%", maxWidth: 1120 }}>
+        <BorrowerPanel {...{ income1, setIncome1, income2, setIncome2, otherDebt, setOtherDebt, burdenRate, setBurdenRate, auditRate, setAuditRate }} />
+
+        <div className="pattern-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 18 }}>
+          {patterns.map((p, i) => {
+            // 基本パターンの月額を計算して比較パネルに渡す
+            const baseP   = patterns[0];
+            const baseDp  = baseP.equityAmountMan * 10000;
+            const baseBonusPTY = baseP.bonusEnabled ? baseP.bonusAmountMan * 10000 : 0;
+            const baseResolvedPrice = baseP.priceMode === "monthly"
+              ? (() => { const pr_ = calcPrincipalFromMonthly({ monthly: baseP.desiredMonthly * 10000, bonusPerTime: baseBonusPTY, rate: baseP.rate, years: baseP.years }); return Math.round((pr_ + baseDp) / 10000); })()
+              : baseP.price;
+            const basePrincipal = Math.max(0, baseResolvedPrice * 10000 - baseDp);
+            const baseBonusP = !baseP.bonusEnabled ? 0 : (() => {
+              const rb = baseP.rate / 100 / 2, nS = baseP.years * 2, B = baseBonusPTY;
+              if (rb === 0) return Math.min(Math.round(B * nS), basePrincipal - 1);
+              return Math.min(Math.round(B * (1 - Math.pow(1 + rb, -nS)) / rb), basePrincipal - 1);
+            })();
+            const baseResult = calcLoan({ principal: basePrincipal, annualRate: baseP.rate, years: baseP.years, type: baseP.type, bonusP: baseBonusP });
+            return (
+              <PatternPanel key={i} p={p} idx={i} onChange={(next) => upd(i, next)}
+                income1={income1} income2={income2} otherDebt={otherDebt} burdenRate={burdenRate} auditRate={auditRate}
+                baseMonthlyPayment={i === 0 ? 0 : baseResult.monthlyPayment}
+                basePatternYears={baseP.years} />
+            );
+          })}
+        </div>
+
+        <CompareTable patterns={patterns} income1={income1} income2={income2} otherDebt={otherDebt} burdenRate={burdenRate} auditRate={auditRate} />
+      </div>
+
+      <div style={{ marginTop: 26, textAlign: "center" }}>
+        <p style={{ fontSize: 11, color: "#bbb", lineHeight: 1.8, margin: "0 0 12px" }}>
+          ※ このシミュレーションは概算です。NISAの運用成果は保証されません。詳細は金融機関にご相談ください。
+        </p>
+        <PrintButton customer={customer} />
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<MortgageApp />);
+</script>
+</body>
+</html>
